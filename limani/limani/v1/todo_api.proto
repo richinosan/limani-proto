@@ -14,6 +14,8 @@ message ListTodosRequest {
   repeated TodoStatus statuses = 2 [(google.api.field_behavior) = OPTIONAL];
   int32 page_size = 3;
   string page_token = 4;
+  // 指定した iCalendar の UID の Todo だけを返す（0件か1件）。空なら絞り込まない。
+  string uid = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListTodosResponse {
@@ -23,7 +25,7 @@ message ListTodosResponse {
 
 // GetTodoRequest は Todo を取得する。
 message GetTodoRequest {
-  // リソース名（calendars/{id}/todos/{uid}）。
+  // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
@@ -54,7 +56,7 @@ message UpdateTodoRequest {
 // COMPLETED にすると completed_time に現在時刻を入れ、percent_complete を 100 にする。
 // COMPLETED から戻すと completed_time を消す。
 message SetTodoStatusRequest {
-  // リソース名（calendars/{id}/todos/{uid}）。
+  // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
   TodoStatus status = 2 [(google.api.field_behavior) = REQUIRED];
   // 指定すると、保存されている etag と違うときに ABORTED を返す。
@@ -63,7 +65,7 @@ message SetTodoStatusRequest {
 
 // DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
 message DeleteTodoRequest {
-  // リソース名（calendars/{id}/todos/{uid}）。
+  // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
   // 指定すると、保存されている etag と違うときに ABORTED を返す。
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];

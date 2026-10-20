@@ -174,8 +174,8 @@ Todo は VTODO 1件。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{id}/todos/{uid}）。 |
-| uid | [string](#string) |  | iCalendar の UID。カレンダー内で一意。作成時に省略するとサーバーが決める。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。 UID は任意の文字列（URL や「/」を含むこともある）なので、リソース名には使わない。 |
+| uid | [string](#string) |  | iCalendar の UID。カレンダー内で一意。作成時に省略するとサーバーが決める。 UID から Todo を探すときは ListTodos の uid で絞り込む。 |
 | summary | [string](#string) |  | SUMMARY。必須。 |
 | description | [string](#string) |  | DESCRIPTION。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  | STATUS。作成時に未指定なら NEEDS-ACTION。 |
@@ -270,7 +270,7 @@ DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を�
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{id}/todos/{uid}）。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。 |
 | etag | [string](#string) |  | 指定すると、保存されている etag と違うときに ABORTED を返す。 |
 
 
@@ -286,7 +286,7 @@ GetTodoRequest は Todo を取得する。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{id}/todos/{uid}）。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。 |
 
 
 
@@ -305,6 +305,7 @@ ListTodosRequest はカレンダー内の Todo を一覧する。
 | statuses | [TodoStatus](#limani-v1-TodoStatus) | repeated | 指定した status の Todo だけを返す。空なら絞り込まない。 |
 | page_size | [int32](#int32) |  |  |
 | page_token | [string](#string) |  |  |
+| uid | [string](#string) |  | 指定した iCalendar の UID の Todo だけを返す（0件か1件）。空なら絞り込まない。 |
 
 
 
@@ -338,7 +339,7 @@ COMPLETED から戻すと completed_time を消す。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{id}/todos/{uid}）。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  |  |
 | etag | [string](#string) |  | 指定すると、保存されている etag と違うときに ABORTED を返す。 |
 

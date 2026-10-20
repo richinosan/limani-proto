@@ -32,9 +32,11 @@ message TodoDateTime {
 
 // Todo は VTODO 1件。
 message Todo {
-  // リソース名（calendars/{id}/todos/{uid}）。
+  // リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。
+  // UID は任意の文字列（URL や「/」を含むこともある）なので、リソース名には使わない。
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
   // iCalendar の UID。カレンダー内で一意。作成時に省略するとサーバーが決める。
+  // UID から Todo を探すときは ListTodos の uid で絞り込む。
   string uid = 2 [(google.api.field_behavior) = IMMUTABLE];
   // SUMMARY。必須。
   string summary = 3 [(google.api.field_behavior) = REQUIRED];
