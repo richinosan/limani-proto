@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// TodoStatus は VTODO の STATUS（RFC 5545 3.8.1.11）。
+enum TodoStatus {
+  TODO_STATUS_UNSPECIFIED = 0;
+  // NEEDS-ACTION
+  TODO_STATUS_NEEDS_ACTION = 1;
+  // IN-PROCESS
+  TODO_STATUS_IN_PROCESS = 2;
+  // COMPLETED
+  TODO_STATUS_COMPLETED = 3;
+  // CANCELLED
+  TODO_STATUS_CANCELLED = 4;
+}
+
+// TodoDateTime は DTSTART・DUE の値。日付（VALUE=DATE）と日時（VALUE=DATE-TIME）を区別する。
+message TodoDateTime {
+  // all_day が false なら、その瞬間。
+  // all_day が true なら、日付を UTC の 00:00:00 で表した値（例: 2026-11-03 は 2026-11-03T00:00:00Z）。
+  google.protobuf.Timestamp time = 1;
+  // true なら日付のみ（VALUE=DATE）。tzid は使わない。
+  bool all_day = 2;
+  // IANA のタイムゾーン名（例: Asia/Tokyo）。ics に TZID として出す。
+  // 空なら UTC（末尾が Z の日時）。all_day のときは無視する。
+  string tzid = 3;
+}
+
+// Todo は VTODO 1件。
+message Todo {
+  // リソース名（calendars/{id}/todos/{uid}）。
+  string name = 1;
+  // iCalendar の UID。カレンダー内で一意。作成時に省略するとサーバーが決める。
+  string uid = 2;
+  // SUMMARY。必須。
+  string summary = 3;
+  // DESCRIPTION。
+  string description = 4;
+  // STATUS。作成時に未指定なら NEEDS-ACTION。
+  TodoStatus status = 5;
+  // PRIORITY（0〜9。0 は未設定、1 が最も高い）。
+  int32 priority = 6;
+  // PERCENT-COMPLETE（0〜100）。
+  int32 percent_complete = 7;
+  // DTSTART。未設定なら省略。
+  TodoDateTime dtstart = 8;
+  // DUE。未設定なら省略。dtstart より前にできず、dtstart と all_day をそろえる。
+  TodoDateTime due = 9;
+  // COMPLETED。status が COMPLETED になると、未指定ならサーバーが現在時刻を入れる。
+  google.protobuf.Timestamp completed_time = 10;
+  // CATEGORIES。
+  repeated string categories = 11;
+  // 親の Todo の UID（RELATED-TO;RELTYPE=PARENT）。
+  string parent_uid = 12;
+  // 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。
+  repeated string assignees = 13;
+  // SEQUENCE。更新のたびに増える。出力専用。
+  int32 sequence = 14;
+  // 楽観的排他制御のための値。CalDAV の ETag と同じ。出力専用。
+  string etag = 15;
+  // VCALENDAR 全文（RFC 5545）。出力専用。
+  string ics = 16;
+  // 作成時刻。出力専用。
+  google.protobuf.Timestamp create_time = 17;
+  // LAST-MODIFIED。出力専用。
+  google.protobuf.Timestamp update_time = 18;
+}
