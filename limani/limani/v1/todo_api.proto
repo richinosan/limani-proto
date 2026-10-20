@@ -2,15 +2,16 @@ syntax = "proto3";
 
 package limani.v1;
 
+import "google/api/field_behavior.proto";
 import "google/protobuf/field_mask.proto";
 import "limani/v1/todo.proto";
 
 // ListTodosRequest はカレンダー内の Todo を一覧する。
 message ListTodosRequest {
   // 親（calendars/{id}）。
-  string parent = 1;
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
   // 指定した status の Todo だけを返す。空なら絞り込まない。
-  repeated TodoStatus statuses = 2;
+  repeated TodoStatus statuses = 2 [(google.api.field_behavior) = OPTIONAL];
   int32 page_size = 3;
   string page_token = 4;
 }
@@ -23,16 +24,16 @@ message ListTodosResponse {
 // GetTodoRequest は Todo を取得する。
 message GetTodoRequest {
   // リソース名（calendars/{id}/todos/{uid}）。
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // CreateTodoRequest は Todo を作る。
 message CreateTodoRequest {
   // 親（calendars/{id}）。
-  string parent = 1;
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
   // 作る Todo。summary は必須。uid が空ならサーバーが決める。
   // name・sequence・etag・ics・create_time・update_time は無視する。
-  Todo todo = 2;
+  Todo todo = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // UpdateTodoRequest は Todo を更新する。
@@ -41,11 +42,11 @@ message CreateTodoRequest {
 // 空なら競合を検出しない。
 message UpdateTodoRequest {
   // 更新する Todo。name で対象を決める。
-  Todo todo = 1;
+  Todo todo = 1 [(google.api.field_behavior) = REQUIRED];
   // 更新するフィールド。次のどれか:
   // summary, description, status, priority, percent_complete,
   // dtstart, due, completed_time, categories, parent_uid, assignees。
-  google.protobuf.FieldMask update_mask = 2;
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // SetTodoStatusRequest は status だけを変える近道。
@@ -54,16 +55,16 @@ message UpdateTodoRequest {
 // COMPLETED から戻すと completed_time を消す。
 message SetTodoStatusRequest {
   // リソース名（calendars/{id}/todos/{uid}）。
-  string name = 1;
-  TodoStatus status = 2;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  TodoStatus status = 2 [(google.api.field_behavior) = REQUIRED];
   // 指定すると、保存されている etag と違うときに ABORTED を返す。
-  string etag = 3;
+  string etag = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
 message DeleteTodoRequest {
   // リソース名（calendars/{id}/todos/{uid}）。
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
   // 指定すると、保存されている etag と違うときに ABORTED を返す。
-  string etag = 2;
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 }

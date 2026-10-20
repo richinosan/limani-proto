@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package limani.v1;
 
+import "google/api/field_behavior.proto";
 import "limani/v1/calendar.proto";
 
 // ListCalendarsRequest は呼び出し元がメンバーであるカレンダーを一覧する。
@@ -13,7 +14,7 @@ import "limani/v1/calendar.proto";
 message ListCalendarsRequest {
   // 絞り込み先の vitrina のリソース名（organizations/{id} または events/{id}）。
   // 空なら絞り込まない。
-  string parent = 1;
+  string parent = 1 [(google.api.field_behavior) = OPTIONAL];
   int32 page_size = 2;
   string page_token = 3;
 }
@@ -27,13 +28,13 @@ message ListCalendarsResponse {
 // メンバーでない場合は NotFound を返す（存在を漏らさないため）。
 message GetCalendarRequest {
   // リソース名（calendars/{id}）。
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // CreateCalendarRequest はカレンダーを作る。呼び出し元が parent のメンバーである必要がある。
 message CreateCalendarRequest {
   // 親（organizations/{id} または events/{id}）。vitrina のリソース名。
-  string parent = 1;
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
   // 作るカレンダー。display_name は必須。name・scope・sync_token は無視する。
-  Calendar calendar = 2;
+  Calendar calendar = 2 [(google.api.field_behavior) = REQUIRED];
 }

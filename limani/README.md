@@ -55,9 +55,9 @@ vitrina の準備会（organization）ごと、またはイベントごとに作
 | scope | [string](#string) |  | 属する vitrina のリソース名（organizations/{id} または events/{id}）。 |
 | display_name | [string](#string) |  | 表示名。 |
 | color | [string](#string) |  | 表示色（#RRGGBB 形式）。未設定なら空。 |
-| sync_token | [int64](#int64) |  | 書き込みのたびに増える連番。CalDAV の差分同期（RFC 6578）に使う。出力専用。 |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。出力専用。 |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 更新時刻。出力専用。 |
+| sync_token | [int64](#int64) |  | 書き込みのたびに増える連番。CalDAV の差分同期（RFC 6578）に使う。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
+| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 更新時刻。 |
 
 
 
@@ -187,11 +187,11 @@ Todo は VTODO 1件。
 | categories | [string](#string) | repeated | CATEGORIES。 |
 | parent_uid | [string](#string) |  | 親の Todo の UID（RELATED-TO;RELTYPE=PARENT）。 |
 | assignees | [string](#string) | repeated | 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。 |
-| sequence | [int32](#int32) |  | SEQUENCE。更新のたびに増える。出力専用。 |
-| etag | [string](#string) |  | 楽観的排他制御のための値。CalDAV の ETag と同じ。出力専用。 |
-| ics | [string](#string) |  | VCALENDAR 全文（RFC 5545）。出力専用。 |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。出力専用。 |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。出力専用。 |
+| sequence | [int32](#int32) |  | SEQUENCE。更新のたびに増える。 |
+| etag | [string](#string) |  | 楽観的排他制御のための値。CalDAV の ETag と同じ。 UpdateTodo で指定すると、保存されている値と違うときに ABORTED を返す。 |
+| ics | [string](#string) |  | VCALENDAR 全文（RFC 5545）。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
+| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。 |
 
 
 
