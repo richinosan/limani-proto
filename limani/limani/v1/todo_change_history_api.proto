@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "limani/v1/todo_change_history.proto";
+
+// ListTodoChangeHistoriesRequest は、Todo の変更履歴を一覧する。
+//
+// 呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
+// 変えた人がカレンダーのメンバーから外れていても、履歴は返る。
+message ListTodoChangeHistoriesRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+  // 1 ページの件数。0 以下なら 50。100 を超える値は 100 にする。
+  int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
+  // 前の応答の next_page_token。空なら最初のページ。
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message ListTodoChangeHistoriesResponse {
+  // 変更した時刻の降順（新しいものが先。同じ時刻なら ID の降順）。
+  repeated TodoChangeHistory todo_change_histories = 1;
+  // 次のページがあるときの page_token。なければ空。
+  string next_page_token = 2;
+}

@@ -79,4 +79,14 @@ message Todo {
   // この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。
   // どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。
   repeated string calendars = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。
+  // CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。
+  // 表示名・アイコンは返さない。kebab の GetUser で引くこと。
+  string creator = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。
+  // UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・
+  // percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees）が実際に変わったときだけ更新する
+  // （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。
+  // TodoChangeHistory の actor と対応する。
+  string last_updater = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
