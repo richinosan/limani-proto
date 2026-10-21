@@ -631,6 +631,7 @@ PUT し直しても、履歴は増えない）。
 | source | [TodoChangeSource](#limani-v1-TodoChangeSource) |  | 変えた経路。 |
 | snapshot | [Todo](#limani-v1-Todo) |  | 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。 sequence・create_time・update_time・creator・last_updater は、変更した時点の値。 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 変更した時刻。 |
+| comment | [string](#string) |  | この変更と同時に書かれたコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 CreateTodoCommentRequest.status で状態を変えたときだけ入る（GitHub の &#34;Close with comment&#34; の、状態の変更の側）。 画面は、このコメントが一覧にあれば、状態の変更を履歴の側では出さない（コメントが同じ出来事を示すため）。 コメントを削除しても、この値は残る（指すコメントはもうない）。コメントと同時でない変更は空。 {calendar} は、問い合わせたカレンダーのもの。 |
 
 
 
