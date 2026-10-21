@@ -7,6 +7,8 @@ import "limani/v1/calendar.proto";
 import "limani/v1/calendar_api.proto";
 import "limani/v1/todo.proto";
 import "limani/v1/todo_api.proto";
+import "limani/v1/todo_link.proto";
+import "limani/v1/todo_link_api.proto";
 
 // CalendarService はカレンダー（タスクリスト）の API。
 // 認証は kebab のアクセストークン（Authorization: Bearer）。
@@ -20,10 +22,19 @@ service CalendarService {
 // TodoService は Todo（VTODO）の API。
 // 認証は kebab のアクセストークン（Authorization: Bearer）。
 service TodoService {
+  // カレンダーに出ている Todo を一覧する（TodoLink で同期されている Todo を含む）。
   rpc ListTodos(ListTodosRequest) returns (ListTodosResponse);
   rpc GetTodo(GetTodoRequest) returns (Todo);
   rpc CreateTodo(CreateTodoRequest) returns (Todo);
   rpc UpdateTodo(UpdateTodoRequest) returns (Todo);
   rpc SetTodoStatus(SetTodoStatusRequest) returns (Todo);
+  // Todo を削除する。Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で呼んでも同じ）。
+  // 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
   rpc DeleteTodo(DeleteTodoRequest) returns (google.protobuf.Empty);
+  // Todo が出ているカレンダーを一覧する。
+  rpc ListTodoLinks(ListTodoLinksRequest) returns (ListTodoLinksResponse);
+  // Todo をほかのカレンダーにもリンクする（イベント間の同期）。
+  rpc CreateTodoLink(CreateTodoLinkRequest) returns (TodoLink);
+  // Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。
+  rpc DeleteTodoLink(DeleteTodoLinkRequest) returns (google.protobuf.Empty);
 }
