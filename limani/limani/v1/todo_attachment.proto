@@ -15,11 +15,12 @@ import "google/protobuf/timestamp.proto";
 // 添付を追加・削除することで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
 //
 // 説明（Todo.description）やコメントの Markdown からは url で参照する。
+// 中身は公開しない。読めるのは、メンバーに返した期限付きの署名付き URL（download_uri）だけ。
 message TodoAttachment {
   // リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。{attachment} はサーバーが決める ULID。
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
   // 返す name は、問い合わせたカレンダーのもの（同じ添付でも、カレンダーごとに name が違う）。
-  // GetTodoAttachmentContent では {calendar} に "-" を指定できる。Todo が出ているカレンダーのどれかのメンバーなら読める。
+  // GetTodoAttachment では {calendar} に "-" を指定できる。Todo が出ているカレンダーのどれかのメンバーなら読める。
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
   // ファイル名。必須で、255 文字（Unicode のコードポイント）まで。
   // 制御文字・"/"・"\" は使えない（INVALID_ARGUMENT）。
@@ -37,15 +38,14 @@ message TodoAttachment {
   // アップロードした時刻。
   google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Markdown に書く URL（{APP_ORIGIN}/admin/attachments/{todo}/{attachment}）。
-  // ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachmentContent で読んで表示する。
-  // {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。
+  // ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachment で引き、download_uri で表示する。
+  // {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。この URL では中身は読めない。
   string url = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// TodoAttachmentContent は、添付のメタデータと中身。
-message TodoAttachmentContent {
-  // 添付のメタデータ。
-  TodoAttachment todo_attachment = 1;
-  // ファイルの中身。
-  bytes data = 2;
+  // 中身を読む、期限付きの署名付き URL（{APP_ORIGIN}/files/todos/{todo}/attachments/{attachment}?exp=...&sig=...）。
+  // ログイン（Bearer）なしで GET でき、署名と期限が合わなければ 403、添付が削除されていれば 404。
+  // 画像（image/png・image/jpeg・image/gif・image/webp）は inline、それ以外は application/octet-stream の attachment（ダウンロード）として返す。
+  // 同じ期間（15 分ごと）の中では同じ URL を返す（ブラウザのキャッシュが効く）。期限が過ぎたら、取り直す。
+  string download_uri = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // download_uri の期限。発行から 15〜30 分後。
+  google.protobuf.Timestamp download_expire_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

@@ -38,10 +38,10 @@ message ListTodoAttachmentsResponse {
   string next_page_token = 2;
 }
 
-// GetTodoAttachmentContentRequest は、添付のメタデータと中身を取得する。
+// GetTodoAttachmentRequest は、添付を取得する（中身は download_uri から読む）。
 //
 // 呼び出し元が、Todo が出ているカレンダーのメンバーである必要がある。
-message GetTodoAttachmentContentRequest {
+message GetTodoAttachmentRequest {
   // リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。
   // {calendar} は Todo が出ているカレンダーのどれでもよい。"-" を指定すると、
   // Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。
