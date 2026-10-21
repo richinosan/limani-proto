@@ -9,6 +9,7 @@ import "limani/v1/todo.proto";
 import "limani/v1/todo_api.proto";
 import "limani/v1/todo_attachment.proto";
 import "limani/v1/todo_attachment_api.proto";
+import "limani/v1/todo_change_history_api.proto";
 import "limani/v1/todo_comment.proto";
 import "limani/v1/todo_comment_api.proto";
 import "limani/v1/todo_link.proto";
@@ -58,4 +59,7 @@ service TodoService {
   rpc GetTodoAttachment(GetTodoAttachmentRequest) returns (TodoAttachment);
   // 添付を削除する。アップロードした人だけができる。
   rpc DeleteTodoAttachment(DeleteTodoAttachmentRequest) returns (google.protobuf.Empty);
+  // Todo の変更履歴を新しい順に一覧する。変更のたびに、変更後の Todo（snapshot）・変えた人・経路（API か CalDAV か）を残す。
+  // 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。
+  rpc ListTodoChangeHistories(ListTodoChangeHistoriesRequest) returns (ListTodoChangeHistoriesResponse);
 }

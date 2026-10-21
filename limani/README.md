@@ -38,6 +38,16 @@
     - [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest)
     - [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse)
   
+- [limani/v1/todo_change_history.proto](#limani_v1_todo_change_history-proto)
+    - [TodoChangeHistory](#limani-v1-TodoChangeHistory)
+  
+    - [TodoChangeSource](#limani-v1-TodoChangeSource)
+    - [TodoChangeType](#limani-v1-TodoChangeType)
+  
+- [limani/v1/todo_change_history_api.proto](#limani_v1_todo_change_history_api-proto)
+    - [ListTodoChangeHistoriesRequest](#limani-v1-ListTodoChangeHistoriesRequest)
+    - [ListTodoChangeHistoriesResponse](#limani-v1-ListTodoChangeHistoriesResponse)
+  
 - [limani/v1/todo_comment.proto](#limani_v1_todo_comment-proto)
     - [TodoComment](#limani-v1-TodoComment)
   
@@ -243,6 +253,8 @@ Todo は VTODO 1件。
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。 |
 | calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
+| creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
+| last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 |
 
 
 
@@ -572,6 +584,130 @@ ListTodoAttachmentsRequest は、Todo の添付を一覧する（中身は含ま
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | todo_attachments | [TodoAttachment](#limani-v1-TodoAttachment) | repeated | アップロード時刻の昇順（古いものが先。同じ時刻なら ID の昇順）。 |
+| next_page_token | [string](#string) |  | 次のページがあるときの page_token。なければ空。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_change_history-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_change_history.proto
+
+
+
+<a name="limani-v1-TodoChangeHistory"></a>
+
+### TodoChangeHistory
+TodoChangeHistory は、Todo の変更履歴の 1 件（変更のたびに、変更後の状態を丸ごと残す）。
+
+履歴は Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される。
+Todo を削除すると、履歴もすべて消える（削除は履歴に残さない）。TodoLink の作成・削除は履歴に残さない。
+コメント（TodoComment）・添付（TodoAttachment）の追加や削除も履歴に残さない。
+
+中身（summary・description・status・priority・percent_complete・dtstart・due・completed_time・categories・
+parent_uid・assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
+PUT し直しても、履歴は増えない）。
+変更の内容は、隣り合う履歴の snapshot を比べて求める（サーバーは差分を持たない）。
+履歴を残し始める前に作られた Todo は、最も古い履歴が CREATE ではなく UPDATE になる。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/changeHistories/{change_history}）。{change_history} はサーバーが決める ID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じ履歴でも、カレンダーごとに name が違う）。 |
+| actor | [string](#string) |  | 変えた人の kebab のユーザー ID（TodoComment.author と同じ形式）。CalDAV からのときは、アプリパスワードの持ち主。 変えた人がカレンダーのメンバーから外れても返る。表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
+| change_type | [TodoChangeType](#limani-v1-TodoChangeType) |  | 変更の種類。 |
+| source | [TodoChangeSource](#limani-v1-TodoChangeSource) |  | 変えた経路。 |
+| snapshot | [Todo](#limani-v1-Todo) |  | 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。 sequence・create_time・update_time・creator・last_updater は、変更した時点の値。 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 変更した時刻。 |
+
+
+
+
+
+ 
+
+
+<a name="limani-v1-TodoChangeSource"></a>
+
+### TodoChangeSource
+TodoChangeSource は、Todo を変えた経路。
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TODO_CHANGE_SOURCE_UNSPECIFIED | 0 |  |
+| TODO_CHANGE_SOURCE_API | 1 | Connect の API（limani の画面を含む）。 |
+| TODO_CHANGE_SOURCE_CALDAV | 2 | CalDAV（iOS のリマインダー・Thunderbird・Tasks.org など）。 |
+
+
+
+<a name="limani-v1-TodoChangeType"></a>
+
+### TodoChangeType
+TodoChangeType は、Todo の変更の種類。
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TODO_CHANGE_TYPE_UNSPECIFIED | 0 |  |
+| TODO_CHANGE_TYPE_CREATE | 1 | Todo の作成。 |
+| TODO_CHANGE_TYPE_UPDATE | 2 | Todo の更新。 |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_change_history_api-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_change_history_api.proto
+
+
+
+<a name="limani-v1-ListTodoChangeHistoriesRequest"></a>
+
+### ListTodoChangeHistoriesRequest
+ListTodoChangeHistoriesRequest は、Todo の変更履歴を一覧する。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
+変えた人がカレンダーのメンバーから外れていても、履歴は返る。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。100 を超える値は 100 にする。 |
+| page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoChangeHistoriesResponse"></a>
+
+### ListTodoChangeHistoriesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_change_histories | [TodoChangeHistory](#limani-v1-TodoChangeHistory) | repeated | 変更した時刻の降順（新しいものが先。同じ時刻なら ID の降順）。 |
 | next_page_token | [string](#string) |  | 次のページがあるときの page_token。なければ空。 |
 
 
@@ -931,6 +1067,7 @@ TodoService は Todo（VTODO）の API。
 | ListTodoAttachments | [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest) | [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse) | Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
 | GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |
 | DeleteTodoAttachment | [DeleteTodoAttachmentRequest](#limani-v1-DeleteTodoAttachmentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | 添付を削除する。アップロードした人だけができる。 |
+| ListTodoChangeHistories | [ListTodoChangeHistoriesRequest](#limani-v1-ListTodoChangeHistoriesRequest) | [ListTodoChangeHistoriesResponse](#limani-v1-ListTodoChangeHistoriesResponse) | Todo の変更履歴を新しい順に一覧する。変更のたびに、変更後の Todo（snapshot）・変えた人・経路（API か CalDAV か）を残す。 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。 |
 
  
 
