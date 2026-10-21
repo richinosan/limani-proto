@@ -42,5 +42,7 @@ message TodoComment {
   // CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。
   // 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。
   // 画面はこれを「完了にした」「再開した」などの出来事として表示できる。
+  // TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。
+  // ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。
   TodoStatus status_change = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

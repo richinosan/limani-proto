@@ -18,6 +18,11 @@ message ListTodoCommentsRequest {
   int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
   // 前の応答の next_page_token。空なら最初のページ。
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+  // 指定すると、TodoComment.status_change がこの値のコメントだけを返す（並び順・ページングは同じ）。
+  // たとえば TODO_STATUS_COMPLETED を指定すると、完了報告だけを取り出せる。
+  // TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。
+  // page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。
+  TodoStatus status_change = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListTodoCommentsResponse {
