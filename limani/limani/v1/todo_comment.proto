@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// TodoComment は、Todo に付けるコメント（GitHub の Issue のコメントのように、Todo について話し合うためのもの）。
+//
+// コメントは Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される
+// （どのカレンダーから書いても、Todo が出ているほかのカレンダーのメンバーに見える）。
+// Todo を削除すると、コメントもすべて消える。TodoLink を外してもコメントは消えない。
+//
+// コメントは iCalendar（RFC 5545）には含まれない。Todo の ics・raw_ics には書かず、CalDAV にも出さない。
+// コメントを書く・直す・消すことで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
+// CalDAV クライアントが書いた COMMENT プロパティは ics にそのまま残り、TodoComment とは無関係。
+message TodoComment {
+  // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
+  // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
+  // 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 本文（プレーンテキスト。改行を含められる）。
+  // 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。
+  // 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // 書いた人の kebab のユーザー ID（Todo.assignees と同じ形式）。
+  // 書いた人がカレンダーのメンバーから外れても、コメントは返る。
+  string author = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 書いた人の表示名。kebab のプロフィールの表示名（なければ username）を、書いた時刻（本文を直した時刻）に写したもの。
+  // 書いたときにプロフィールを取得できなかったときは空。直したときに取得できなかったときは、前の値のまま。
+  string author_display_name = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。
+  string author_image_url = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 作成時刻。
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 本文を最後に直した時刻。直していなければ create_time と同じ。
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

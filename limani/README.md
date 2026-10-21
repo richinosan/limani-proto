@@ -27,6 +27,16 @@
     - [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest)
     - [UpdateTodoRequest](#limani-v1-UpdateTodoRequest)
   
+- [limani/v1/todo_comment.proto](#limani_v1_todo_comment-proto)
+    - [TodoComment](#limani-v1-TodoComment)
+  
+- [limani/v1/todo_comment_api.proto](#limani_v1_todo_comment_api-proto)
+    - [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest)
+    - [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest)
+    - [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest)
+    - [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse)
+    - [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest)
+  
 - [limani/v1/todo_link.proto](#limani_v1_todo_link-proto)
     - [TodoLink](#limani-v1-TodoLink)
   
@@ -391,6 +401,157 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 
 
 
+<a name="limani_v1_todo_comment-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_comment.proto
+
+
+
+<a name="limani-v1-TodoComment"></a>
+
+### TodoComment
+TodoComment は、Todo に付けるコメント（GitHub の Issue のコメントのように、Todo について話し合うためのもの）。
+
+コメントは Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される
+（どのカレンダーから書いても、Todo が出ているほかのカレンダーのメンバーに見える）。
+Todo を削除すると、コメントもすべて消える。TodoLink を外してもコメントは消えない。
+
+コメントは iCalendar（RFC 5545）には含まれない。Todo の ics・raw_ics には書かず、CalDAV にも出さない。
+コメントを書く・直す・消すことで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
+CalDAV クライアントが書いた COMMENT プロパティは ics にそのまま残り、TodoComment とは無関係。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。 |
+| body | [string](#string) |  | 本文（プレーンテキスト。改行を含められる）。 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。 |
+| author | [string](#string) |  | 書いた人の kebab のユーザー ID（Todo.assignees と同じ形式）。 書いた人がカレンダーのメンバーから外れても、コメントは返る。 |
+| author_display_name | [string](#string) |  | 書いた人の表示名。kebab のプロフィールの表示名（なければ username）を、書いた時刻（本文を直した時刻）に写したもの。 書いたときにプロフィールを取得できなかったときは空。直したときに取得できなかったときは、前の値のまま。 |
+| author_image_url | [string](#string) |  | 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
+| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 本文を最後に直した時刻。直していなければ create_time と同じ。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_comment_api-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_comment_api.proto
+
+
+
+<a name="limani-v1-CreateTodoCommentRequest"></a>
+
+### CreateTodoCommentRequest
+CreateTodoCommentRequest は、Todo にコメントを書く。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある。
+1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。body は必須。name・author・author_display_name・author_image_url・create_time・update_time は無視する。 |
+
+
+
+
+
+
+<a name="limani-v1-DeleteTodoCommentRequest"></a>
+
+### DeleteTodoCommentRequest
+DeleteTodoCommentRequest は、コメントを削除する（物理削除。記録は残さない）。
+
+消せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoCommentsRequest"></a>
+
+### ListTodoCommentsRequest
+ListTodoCommentsRequest は、Todo のコメントを一覧する。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある。
+書いた人がカレンダーのメンバーから外れていても、コメントは返る。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。 |
+| page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoCommentsResponse"></a>
+
+### ListTodoCommentsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_comments | [TodoComment](#limani-v1-TodoComment) | repeated | 作成時刻の昇順（古いものが先。同じ時刻なら ID の昇順）。 |
+| next_page_token | [string](#string) |  | 次のページがあるときの page_token。なければ空。 |
+
+
+
+
+
+
+<a name="limani-v1-UpdateTodoCommentRequest"></a>
+
+### UpdateTodoCommentRequest
+UpdateTodoCommentRequest は、コメントの本文を直す。
+
+直せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。指定できるのは body だけ。空なら body を更新する。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="limani_v1_todo_link-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -563,6 +724,10 @@ TodoService は Todo（VTODO）の API。
 | ListTodoLinks | [ListTodoLinksRequest](#limani-v1-ListTodoLinksRequest) | [ListTodoLinksResponse](#limani-v1-ListTodoLinksResponse) | Todo が出ているカレンダーを一覧する。 |
 | CreateTodoLink | [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest) | [TodoLink](#limani-v1-TodoLink) | Todo をほかのカレンダーにもリンクする（イベント間の同期）。 |
 | DeleteTodoLink | [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。 |
+| ListTodoComments | [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest) | [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse) | Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
+| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 |
+| UpdateTodoComment | [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントの本文を直す。書いた人だけができる。 |
+| DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。 |
 
  
 
