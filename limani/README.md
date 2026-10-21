@@ -5,6 +5,7 @@
 
 - [limani/v1/calendar.proto](#limani_v1_calendar-proto)
     - [Calendar](#limani-v1-Calendar)
+    - [CalendarCallerPermissions](#limani-v1-CalendarCallerPermissions)
   
 - [limani/v1/calendar_api.proto](#limani_v1_calendar_api-proto)
     - [CreateCalendarRequest](#limani-v1-CreateCalendarRequest)
@@ -77,6 +78,25 @@ vitrina の準備会（organization）ごと、またはイベントごとに作
 | sync_token | [int64](#int64) |  | 書き込みのたびに増える連番。CalDAV の差分同期（RFC 6578）に使う。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 更新時刻。 |
+| caller_permissions | [CalendarCallerPermissions](#limani-v1-CalendarCallerPermissions) |  | 呼び出し元がこのカレンダーに対して持つ権限。呼び出し側に依存する情報のため、 Calendar の一部としてキャッシュしてはならない。vitrina の Event.caller_permissions に対応する。 |
+
+
+
+
+
+
+<a name="limani-v1-CalendarCallerPermissions"></a>
+
+### CalendarCallerPermissions
+CalendarCallerPermissions は、このカレンダーに対して呼び出し元（リクエストの認証主体）が
+持つ権限を表す。権限は vitrina のロールで決まる（イベントのカレンダーはイベントの、
+準備会のカレンダーは準備会の read / update 権限）。メンバーは Todo とカレンダーを読める。
+can_update が false のメンバーは読むだけで、書き込み系の RPC は PERMISSION_DENIED になる。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| can_update | [bool](#bool) |  | Todo の作成・更新・完了・削除、リンクの追加・解除ができるか （vitrina の event.update / organization.update に相当する権限を持つか）。 |
 
 
 
@@ -102,7 +122,8 @@ vitrina の準備会（organization）ごと、またはイベントごとに作
 <a name="limani-v1-CreateCalendarRequest"></a>
 
 ### CreateCalendarRequest
-CreateCalendarRequest はカレンダーを作る。呼び出し元が parent のメンバーである必要がある。
+CreateCalendarRequest はカレンダーを作る。呼び出し元が parent のメンバーで、かつ書き込み権限（event.update / organization.update 相当）を持つ必要がある。
+読むだけのメンバーは PERMISSION_DENIED。
 
 
 | Field | Type | Label | Description |
@@ -288,7 +309,7 @@ CreateTodoRequest は Todo を作る。
 DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
 
 Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で指定しても同じ。
-呼び出し元がそのカレンダーのメンバーである必要がある）。
+呼び出し元がそのカレンダーの書き込み権限を持つメンバーである必要がある）。
 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
 
 
@@ -602,7 +623,8 @@ Todo を削除すると、すべてのカレンダーから消える。
 ### CreateTodoLinkRequest
 CreateTodoLinkRequest は、Todo をほかのカレンダーにもリンクする。
 
-呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方のメンバーである必要がある。
+呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方で書き込み権限を持つメンバーである必要がある。
+リンク先のメンバーでなければ NOT_FOUND、書き込み権限がなければ PERMISSION_DENIED。
 リンク先のカレンダーに同じ UID の Todo がすでにある場合と、Todo がすでにそのカレンダーに出ている場合は、
 ALREADY_EXISTS を返す。
 リンク先のカレンダーの CalDAV クライアントには、次の同期で Todo が現れる。
@@ -623,7 +645,8 @@ ALREADY_EXISTS を返す。
 ### DeleteTodoLinkRequest
 DeleteTodoLinkRequest は、Todo をカレンダーから外す（同期をやめる。リンクを削除する）。
 
-呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方のメンバーである必要がある。
+呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方で書き込み権限を持つメンバーである必要がある。
+書き込み権限がなければ PERMISSION_DENIED。
 外したカレンダーの CalDAV クライアントには、次の同期で Todo が削除として伝わる（削除の記録を残す）。
 ほかのカレンダーには Todo が残る。Todo が出ているカレンダーが 1 つだけのときは外せない（FAILED_PRECONDITION）。
 そのときは Todo を削除する。
