@@ -52,10 +52,10 @@ service TodoService {
   rpc DeleteTodoComment(DeleteTodoCommentRequest) returns (google.protobuf.Empty);
   // Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。
   rpc CreateTodoAttachment(CreateTodoAttachmentRequest) returns (TodoAttachment);
-  // Todo の添付を古い順に一覧する（中身は含まない）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。
+  // Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。
   rpc ListTodoAttachments(ListTodoAttachmentsRequest) returns (ListTodoAttachmentsResponse);
-  // 添付のメタデータと中身を取得する。name の {calendar} に "-" を指定できる。
-  rpc GetTodoAttachmentContent(GetTodoAttachmentContentRequest) returns (TodoAttachmentContent);
+  // 添付を取得する（中身は download_uri から読む）。name の {calendar} に "-" を指定できる。
+  rpc GetTodoAttachment(GetTodoAttachmentRequest) returns (TodoAttachment);
   // 添付を削除する。アップロードした人だけができる。
   rpc DeleteTodoAttachment(DeleteTodoAttachmentRequest) returns (google.protobuf.Empty);
 }
