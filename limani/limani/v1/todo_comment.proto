@@ -19,7 +19,8 @@ message TodoComment {
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
   // 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 本文（プレーンテキスト。改行を含められる）。
+  // 本文。GitHub Flavored Markdown（GFM）として表示する。サーバーは Markdown を解釈せず、そのまま保存して返す
+  // （表示する側で HTML に変換し、サニタイズすること）。
   // 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。
   // 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。
   string body = 2 [(google.api.field_behavior) = REQUIRED];
