@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// TodoAttachment は、Todo に添付したファイル（コメントや説明に貼る画像、成果物など）。
+//
+// 添付は Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される
+// （どのカレンダーから添付しても、Todo が出ているほかのカレンダーのメンバーに見える）。
+// Todo を削除すると、添付もすべて消える。TodoLink を外しても添付は消えない。
+//
+// 添付は iCalendar（RFC 5545）には含まれない。Todo の ics・raw_ics に ATTACH は書かず、CalDAV にも出さない。
+// 添付を追加・削除することで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
+//
+// 説明（Todo.description）やコメントの Markdown からは url で参照する。
+message TodoAttachment {
+  // リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。{attachment} はサーバーが決める ULID。
+  // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
+  // 返す name は、問い合わせたカレンダーのもの（同じ添付でも、カレンダーごとに name が違う）。
+  // GetTodoAttachmentContent では {calendar} に "-" を指定できる。Todo が出ているカレンダーのどれかのメンバーなら読める。
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // ファイル名。必須で、255 文字（Unicode のコードポイント）まで。
+  // 制御文字・"/"・"\" は使えない（INVALID_ARGUMENT）。
+  string filename = 2 [(google.api.field_behavior) = REQUIRED];
+  // MIME タイプ（小文字、パラメーターなし）。空なら application/octet-stream。
+  // 大文字は小文字にし、";" 以降のパラメーターは取り除く。type/subtype の形でなければ application/octet-stream として保存する。
+  // 画像（image/png・image/jpeg・image/gif・image/webp）は、中身の先頭のバイトがその形式と合わなければ
+  // application/octet-stream として保存する。
+  string content_type = 3 [(google.api.field_behavior) = OPTIONAL];
+  // ファイルの大きさ（バイト）。
+  int64 size_bytes = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // アップロードした人の kebab のユーザー ID（Todo.assignees と同じ形式）。
+  // アップロードした人がカレンダーのメンバーから外れても、添付は返る。
+  string uploader = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // アップロードした時刻。
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Markdown に書く URL（{APP_ORIGIN}/admin/attachments/{todo}/{attachment}）。
+  // ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachmentContent で読んで表示する。
+  // {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。
+  string url = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// TodoAttachmentContent は、添付のメタデータと中身。
+message TodoAttachmentContent {
+  // 添付のメタデータ。
+  TodoAttachment todo_attachment = 1;
+  // ファイルの中身。
+  bytes data = 2;
+}
