@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "limani/v1/todo.proto";
+
+// TodoChangeType は、Todo の変更の種類。
+enum TodoChangeType {
+  TODO_CHANGE_TYPE_UNSPECIFIED = 0;
+  // Todo の作成。
+  TODO_CHANGE_TYPE_CREATE = 1;
+  // Todo の更新。
+  TODO_CHANGE_TYPE_UPDATE = 2;
+}
+
+// TodoChangeSource は、Todo を変えた経路。
+enum TodoChangeSource {
+  TODO_CHANGE_SOURCE_UNSPECIFIED = 0;
+  // Connect の API（limani の画面を含む）。
+  TODO_CHANGE_SOURCE_API = 1;
+  // CalDAV（iOS のリマインダー・Thunderbird・Tasks.org など）。
+  TODO_CHANGE_SOURCE_CALDAV = 2;
+}
+
+// TodoChangeHistory は、Todo の変更履歴の 1 件（変更のたびに、変更後の状態を丸ごと残す）。
+//
+// 履歴は Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される。
+// Todo を削除すると、履歴もすべて消える（削除は履歴に残さない）。TodoLink の作成・削除は履歴に残さない。
+// コメント（TodoComment）・添付（TodoAttachment）の追加や削除も履歴に残さない。
+//
+// 中身（summary・description・status・priority・percent_complete・dtstart・due・completed_time・categories・
+// parent_uid・assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
+// PUT し直しても、履歴は増えない）。
+// 変更の内容は、隣り合う履歴の snapshot を比べて求める（サーバーは差分を持たない）。
+// 履歴を残し始める前に作られた Todo は、最も古い履歴が CREATE ではなく UPDATE になる。
+message TodoChangeHistory {
+  // リソース名（calendars/{calendar}/todos/{todo}/changeHistories/{change_history}）。{change_history} はサーバーが決める ID。
+  // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
+  // 返す name は、問い合わせたカレンダーのもの（同じ履歴でも、カレンダーごとに name が違う）。
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 変えた人の kebab のユーザー ID（TodoComment.author と同じ形式）。CalDAV からのときは、アプリパスワードの持ち主。
+  // 変えた人がカレンダーのメンバーから外れても返る。表示名・アイコンは返さない。kebab の GetUser で引くこと。
+  string actor = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 変更の種類。
+  TodoChangeType change_type = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 変えた経路。
+  TodoChangeSource source = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。
+  // sequence・create_time・update_time・creator・last_updater は、変更した時点の値。
+  // 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。
+  Todo snapshot = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 変更した時刻。
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
