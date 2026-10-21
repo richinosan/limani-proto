@@ -31,7 +31,8 @@ message GetCalendarRequest {
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-// CreateCalendarRequest はカレンダーを作る。呼び出し元が parent のメンバーである必要がある。
+// CreateCalendarRequest はカレンダーを作る。呼び出し元が parent のメンバーで、かつ書き込み権限（event.update / organization.update 相当）を持つ必要がある。
+// 読むだけのメンバーは PERMISSION_DENIED。
 message CreateCalendarRequest {
   // 親（organizations/{id} または events/{id}）。vitrina のリソース名。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
