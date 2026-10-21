@@ -7,6 +7,8 @@ import "limani/v1/calendar.proto";
 import "limani/v1/calendar_api.proto";
 import "limani/v1/todo.proto";
 import "limani/v1/todo_api.proto";
+import "limani/v1/todo_attachment.proto";
+import "limani/v1/todo_attachment_api.proto";
 import "limani/v1/todo_comment.proto";
 import "limani/v1/todo_comment_api.proto";
 import "limani/v1/todo_link.proto";
@@ -42,9 +44,18 @@ service TodoService {
   // Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。
   rpc ListTodoComments(ListTodoCommentsRequest) returns (ListTodoCommentsResponse);
   // Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。
+  // status を指定すると、コメントと同時に Todo の状態を変える（GitHub の "Close with comment"）。
   rpc CreateTodoComment(CreateTodoCommentRequest) returns (TodoComment);
   // コメントの本文を直す。書いた人だけができる。
   rpc UpdateTodoComment(UpdateTodoCommentRequest) returns (TodoComment);
   // コメントを削除する。書いた人だけができる。
   rpc DeleteTodoComment(DeleteTodoCommentRequest) returns (google.protobuf.Empty);
+  // Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。
+  rpc CreateTodoAttachment(CreateTodoAttachmentRequest) returns (TodoAttachment);
+  // Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。
+  rpc ListTodoAttachments(ListTodoAttachmentsRequest) returns (ListTodoAttachmentsResponse);
+  // 添付を取得する（中身は download_uri から読む）。name の {calendar} に "-" を指定できる。
+  rpc GetTodoAttachment(GetTodoAttachmentRequest) returns (TodoAttachment);
+  // 添付を削除する。アップロードした人だけができる。
+  rpc DeleteTodoAttachment(DeleteTodoAttachmentRequest) returns (google.protobuf.Empty);
 }
