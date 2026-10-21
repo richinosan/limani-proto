@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "limani/v1/todo_attachment.proto";
+
+// CreateTodoAttachmentRequest は、Todo にファイルを添付する。
+//
+// 呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる。Todo の書き込み権限とは別）。
+// 1 つの Todo に付けられる添付は 500 件まで（超えると RESOURCE_EXHAUSTED）。
+message CreateTodoAttachmentRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+  // 作る添付。filename は必須。content_type は任意。name・size_bytes・uploader・create_time・url は無視する。
+  TodoAttachment todo_attachment = 2 [(google.api.field_behavior) = REQUIRED];
+  // ファイルの中身。1 バイト以上 10 MiB（10485760 バイト）まで（空・超過は INVALID_ARGUMENT）。
+  bytes data = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+// ListTodoAttachmentsRequest は、Todo の添付を一覧する（中身は含まない）。
+//
+// 呼び出し元が parent のカレンダーのメンバーである必要がある。
+// アップロードした人がカレンダーのメンバーから外れていても、添付は返る。
+message ListTodoAttachmentsRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+  // 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。
+  int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
+  // 前の応答の next_page_token。空なら最初のページ。
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message ListTodoAttachmentsResponse {
+  // アップロード時刻の昇順（古いものが先。同じ時刻なら ID の昇順）。
+  repeated TodoAttachment todo_attachments = 1;
+  // 次のページがあるときの page_token。なければ空。
+  string next_page_token = 2;
+}
+
+// GetTodoAttachmentRequest は、添付を取得する（中身は download_uri から読む）。
+//
+// 呼び出し元が、Todo が出ているカレンダーのメンバーである必要がある。
+message GetTodoAttachmentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。
+  // {calendar} は Todo が出ているカレンダーのどれでもよい。"-" を指定すると、
+  // Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。
+  // "-" のときに返す name も "-" のまま。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DeleteTodoAttachmentRequest は、添付を削除する（物理削除。記録は残さない）。
+//
+// 消せるのはアップロードした人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+// その添付を Markdown で参照している説明・コメントは、壊れた添付の表示になる。
+message DeleteTodoAttachmentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}

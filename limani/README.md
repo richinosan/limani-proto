@@ -28,6 +28,16 @@
     - [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest)
     - [UpdateTodoRequest](#limani-v1-UpdateTodoRequest)
   
+- [limani/v1/todo_attachment.proto](#limani_v1_todo_attachment-proto)
+    - [TodoAttachment](#limani-v1-TodoAttachment)
+  
+- [limani/v1/todo_attachment_api.proto](#limani_v1_todo_attachment_api-proto)
+    - [CreateTodoAttachmentRequest](#limani-v1-CreateTodoAttachmentRequest)
+    - [DeleteTodoAttachmentRequest](#limani-v1-DeleteTodoAttachmentRequest)
+    - [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest)
+    - [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest)
+    - [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse)
+  
 - [limani/v1/todo_comment.proto](#limani_v1_todo_comment-proto)
     - [TodoComment](#limani-v1-TodoComment)
   
@@ -422,6 +432,162 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 
 
 
+<a name="limani_v1_todo_attachment-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_attachment.proto
+
+
+
+<a name="limani-v1-TodoAttachment"></a>
+
+### TodoAttachment
+TodoAttachment は、Todo に添付したファイル（コメントや説明に貼る画像、成果物など）。
+
+添付は Todo に属する。Todo と同じく、Todo が出ているすべてのカレンダー（TodoLink）で共有される
+（どのカレンダーから添付しても、Todo が出ているほかのカレンダーのメンバーに見える）。
+Todo を削除すると、添付もすべて消える。TodoLink を外しても添付は消えない。
+
+添付は iCalendar（RFC 5545）には含まれない。Todo の ics・raw_ics に ATTACH は書かず、CalDAV にも出さない。
+添付を追加・削除することで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
+
+説明（Todo.description）やコメントの Markdown からは url で参照する。
+中身は公開しない。読めるのは、メンバーに返した期限付きの署名付き URL（download_uri）だけ。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。{attachment} はサーバーが決める ULID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じ添付でも、カレンダーごとに name が違う）。 GetTodoAttachment では {calendar} に &#34;-&#34; を指定できる。Todo が出ているカレンダーのどれかのメンバーなら読める。 |
+| filename | [string](#string) |  | ファイル名。必須で、255 文字（Unicode のコードポイント）まで。 制御文字・&#34;/&#34;・&#34;\&#34; は使えない（INVALID_ARGUMENT）。 |
+| content_type | [string](#string) |  | MIME タイプ（小文字、パラメーターなし）。空なら application/octet-stream。 大文字は小文字にし、&#34;;&#34; 以降のパラメーターは取り除く。type/subtype の形でなければ application/octet-stream として保存する。 画像（image/png・image/jpeg・image/gif・image/webp）は、中身の先頭のバイトがその形式と合わなければ application/octet-stream として保存する。 |
+| size_bytes | [int64](#int64) |  | ファイルの大きさ（バイト）。 |
+| uploader | [string](#string) |  | アップロードした人の kebab のユーザー ID（Todo.assignees と同じ形式）。 アップロードした人がカレンダーのメンバーから外れても、添付は返る。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | アップロードした時刻。 |
+| url | [string](#string) |  | Markdown に書く URL（{APP_ORIGIN}/admin/attachments/{todo}/{attachment}）。 ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachment で引き、download_uri で表示する。 {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。この URL では中身は読めない。 |
+| download_uri | [string](#string) |  | 中身を読む、期限付きの署名付き URL（{APP_ORIGIN}/files/todos/{todo}/attachments/{attachment}?exp=...&amp;sig=...）。 ログイン（Bearer）なしで GET でき、署名と期限が合わなければ 403、添付が削除されていれば 404。 画像（image/png・image/jpeg・image/gif・image/webp）は inline、それ以外は application/octet-stream の attachment（ダウンロード）として返す。 同じ期間（15 分ごと）の中では同じ URL を返す（ブラウザのキャッシュが効く）。期限が過ぎたら、取り直す。 |
+| download_expire_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | download_uri の期限。発行から 15〜30 分後。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_attachment_api-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_attachment_api.proto
+
+
+
+<a name="limani-v1-CreateTodoAttachmentRequest"></a>
+
+### CreateTodoAttachmentRequest
+CreateTodoAttachmentRequest は、Todo にファイルを添付する。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる。Todo の書き込み権限とは別）。
+1 つの Todo に付けられる添付は 500 件まで（超えると RESOURCE_EXHAUSTED）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| todo_attachment | [TodoAttachment](#limani-v1-TodoAttachment) |  | 作る添付。filename は必須。content_type は任意。name・size_bytes・uploader・create_time・url は無視する。 |
+| data | [bytes](#bytes) |  | ファイルの中身。1 バイト以上 10 MiB（10485760 バイト）まで（空・超過は INVALID_ARGUMENT）。 |
+
+
+
+
+
+
+<a name="limani-v1-DeleteTodoAttachmentRequest"></a>
+
+### DeleteTodoAttachmentRequest
+DeleteTodoAttachmentRequest は、添付を削除する（物理削除。記録は残さない）。
+
+消せるのはアップロードした人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+その添付を Markdown で参照している説明・コメントは、壊れた添付の表示になる。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。 |
+
+
+
+
+
+
+<a name="limani-v1-GetTodoAttachmentRequest"></a>
+
+### GetTodoAttachmentRequest
+GetTodoAttachmentRequest は、添付を取得する（中身は download_uri から読む）。
+
+呼び出し元が、Todo が出ているカレンダーのメンバーである必要がある。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。 {calendar} は Todo が出ているカレンダーのどれでもよい。&#34;-&#34; を指定すると、 Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。 &#34;-&#34; のときに返す name も &#34;-&#34; のまま。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoAttachmentsRequest"></a>
+
+### ListTodoAttachmentsRequest
+ListTodoAttachmentsRequest は、Todo の添付を一覧する（中身は含まない）。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある。
+アップロードした人がカレンダーのメンバーから外れていても、添付は返る。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。 |
+| page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoAttachmentsResponse"></a>
+
+### ListTodoAttachmentsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_attachments | [TodoAttachment](#limani-v1-TodoAttachment) | repeated | アップロード時刻の昇順（古いものが先。同じ時刻なら ID の昇順）。 |
+| next_page_token | [string](#string) |  | 次のページがあるときの page_token。なければ空。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="limani_v1_todo_comment-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -446,12 +612,13 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。 |
-| body | [string](#string) |  | 本文。GitHub Flavored Markdown（GFM）として表示する。サーバーは Markdown を解釈せず、そのまま保存して返す （表示する側で HTML に変換し、サニタイズすること）。 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。 |
+| body | [string](#string) |  | 本文。GitHub Flavored Markdown（GFM）として表示する。サーバーは Markdown を解釈せず、そのまま保存して返す （表示する側で HTML に変換し、サニタイズすること）。 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。 ただし CreateTodoCommentRequest.status を指定して書くときは、空にできる（出来事だけの記録になる）。 |
 | author | [string](#string) |  | 書いた人の kebab のユーザー ID（Todo.assignees と同じ形式）。 書いた人がカレンダーのメンバーから外れても、コメントは返る。 |
 | author_display_name | [string](#string) |  | 書いた人の表示名。kebab のプロフィールの表示名（なければ username）を、書いた時刻（本文を直した時刻）に写したもの。 書いたときにプロフィールを取得できなかったときは空。直したときに取得できなかったときは、前の値のまま。 |
 | author_image_url | [string](#string) |  | 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 本文を最後に直した時刻。直していなければ create_time と同じ。 |
+| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
 
 
 
@@ -479,14 +646,22 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 ### CreateTodoCommentRequest
 CreateTodoCommentRequest は、Todo にコメントを書く。
 
-呼び出し元が parent のカレンダーのメンバーである必要がある。
+呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
 1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED）。
+
+status を指定すると、GitHub の &#34;Close with comment&#34; のように、Todo の状態を変えてからコメントを書く。
+状態の変更は SetTodoStatus と同じ（COMPLETED にすると completed_time が入り percent_complete が 100 になる。
+COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
+カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
+読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+状態を変えられなかったときは、コメントも書かない。
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。body は必須。name・author・author_display_name・author_image_url・create_time・update_time は無視する。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。 name・author・author_display_name・author_image_url・create_time・update_time・status_change は無視する。 |
+| status | [TodoStatus](#limani-v1-TodoStatus) |  | コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。 今の状態と同じでもよい（SetTodoStatus と同じく Todo は書き直され、コメントが status_change つきで書かれる）。 |
 
 
 
@@ -524,6 +699,7 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
 | page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。 |
 | page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
+| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | 指定すると、TodoComment.status_change がこの値のコメントだけを返す（並び順・ページングは同じ）。 たとえば TODO_STATUS_COMPLETED を指定すると、完了報告だけを取り出せる。 TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。 page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
 
 
 
@@ -748,9 +924,13 @@ TodoService は Todo（VTODO）の API。
 | CreateTodoLink | [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest) | [TodoLink](#limani-v1-TodoLink) | Todo をほかのカレンダーにもリンクする（イベント間の同期）。 |
 | DeleteTodoLink | [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。 |
 | ListTodoComments | [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest) | [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse) | Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
-| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 |
+| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。 |
 | UpdateTodoComment | [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントの本文を直す。書いた人だけができる。 |
 | DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。 |
+| CreateTodoAttachment | [CreateTodoAttachmentRequest](#limani-v1-CreateTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。 |
+| ListTodoAttachments | [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest) | [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse) | Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
+| GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |
+| DeleteTodoAttachment | [DeleteTodoAttachmentRequest](#limani-v1-DeleteTodoAttachmentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | 添付を削除する。アップロードした人だけができる。 |
 
  
 

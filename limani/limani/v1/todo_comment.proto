@@ -4,6 +4,7 @@ package limani.v1;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
+import "limani/v1/todo.proto";
 
 // TodoComment は、Todo に付けるコメント（GitHub の Issue のコメントのように、Todo について話し合うためのもの）。
 //
@@ -23,6 +24,7 @@ message TodoComment {
   // （表示する側で HTML に変換し、サニタイズすること）。
   // 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。
   // 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。
+  // ただし CreateTodoCommentRequest.status を指定して書くときは、空にできる（出来事だけの記録になる）。
   string body = 2 [(google.api.field_behavior) = REQUIRED];
   // 書いた人の kebab のユーザー ID（Todo.assignees と同じ形式）。
   // 書いた人がカレンダーのメンバーから外れても、コメントは返る。
@@ -36,4 +38,11 @@ message TodoComment {
   google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 本文を最後に直した時刻。直していなければ create_time と同じ。
   google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // このコメントと同時に変えた Todo の状態（GitHub の "Close with comment"）。
+  // CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。
+  // 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。
+  // 画面はこれを「完了にした」「再開した」などの出来事として表示できる。
+  // TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。
+  // ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。
+  TodoStatus status_change = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
