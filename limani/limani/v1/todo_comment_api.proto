@@ -4,6 +4,7 @@ package limani.v1;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/field_mask.proto";
+import "limani/v1/todo.proto";
 import "limani/v1/todo_comment.proto";
 
 // ListTodoCommentsRequest は、Todo のコメントを一覧する。
@@ -28,13 +29,25 @@ message ListTodoCommentsResponse {
 
 // CreateTodoCommentRequest は、Todo にコメントを書く。
 //
-// 呼び出し元が parent のカレンダーのメンバーである必要がある。
+// 呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
 // 1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED）。
+//
+// status を指定すると、GitHub の "Close with comment" のように、Todo の状態を変えてからコメントを書く。
+// 状態の変更は SetTodoStatus と同じ（COMPLETED にすると completed_time が入り percent_complete が 100 になる。
+// COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
+// カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
+// 読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+// 状態を変えられなかったときは、コメントも書かない。
 message CreateTodoCommentRequest {
   // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
-  // 作るコメント。body は必須。name・author・author_display_name・author_image_url・create_time・update_time は無視する。
+  // 作るコメント。status を指定しないときは body が必須。
+  // name・author・author_display_name・author_image_url・create_time・update_time・status_change は無視する。
   TodoComment todo_comment = 2 [(google.api.field_behavior) = REQUIRED];
+  // コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。
+  // 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。
+  // 今の状態と同じでもよい（SetTodoStatus と同じく Todo は書き直され、コメントが status_change つきで書かれる）。
+  TodoStatus status = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // UpdateTodoCommentRequest は、コメントの本文を直す。
