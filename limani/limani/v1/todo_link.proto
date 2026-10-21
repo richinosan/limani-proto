@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// TodoLink は、Todo が表示されているカレンダーとの関係（イベント間の同期）。
+//
+// Todo は 1 件だけ保存され、複数のカレンダーに出る（コピーはしない）。
+// どのカレンダーの一覧・CalDAV にも同じ Todo が出て、どのカレンダーから編集しても同じ Todo が更新される。
+// 「持ち主のカレンダー」はない。Todo が出ているカレンダーは、すべて TodoLink で表される。
+// Todo を削除すると、すべてのカレンダーから消える。
+message TodoLink {
+  // リソース名（calendars/{calendar}/todos/{todo}/links/{link}）。
+  // {link} は表示先のカレンダーの ID（calendar の calendars/{id} の {id}）。
+  // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Todo を表示するカレンダー（calendars/{id}）。
+  string calendar = 2 [(google.api.field_behavior) = REQUIRED];
+  // Todo がこのカレンダーに出た時刻（Todo を作った時刻、またはリンクを作った時刻）。
+  google.protobuf.Timestamp create_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

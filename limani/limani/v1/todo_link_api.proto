@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "limani/v1/todo_link.proto";
+
+// ListTodoLinksRequest は、Todo が出ているカレンダーを一覧する。
+// 1 つの Todo は 50 のカレンダーまでなので、ページングはしない。
+//
+// 呼び出し元が parent のカレンダーのメンバーである必要がある。
+// ほかのカレンダーのメンバーでなくても、Todo が出ているカレンダーの ID は返る。
+message ListTodoLinksRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListTodoLinksResponse {
+  // カレンダーの ID の昇順。
+  repeated TodoLink todo_links = 1;
+}
+
+// CreateTodoLinkRequest は、Todo をほかのカレンダーにもリンクする。
+//
+// 呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方のメンバーである必要がある。
+// リンク先のカレンダーに同じ UID の Todo がすでにある場合と、Todo がすでにそのカレンダーに出ている場合は、
+// ALREADY_EXISTS を返す。
+// リンク先のカレンダーの CalDAV クライアントには、次の同期で Todo が現れる。
+message CreateTodoLinkRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+  // 作るリンク。calendar は必須（リンク先のカレンダー）。name・create_time は無視する。
+  TodoLink todo_link = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DeleteTodoLinkRequest は、Todo をカレンダーから外す（同期をやめる。リンクを削除する）。
+//
+// 呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方のメンバーである必要がある。
+// 外したカレンダーの CalDAV クライアントには、次の同期で Todo が削除として伝わる（削除の記録を残す）。
+// ほかのカレンダーには Todo が残る。Todo が出ているカレンダーが 1 つだけのときは外せない（FAILED_PRECONDITION）。
+// そのときは Todo を削除する。
+message DeleteTodoLinkRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/links/{link}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}

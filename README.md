@@ -13,7 +13,7 @@ limani は、イベント単位・準備会単位のタスク管理サービス�
 limani.v1
 ```
 
-`limani.v1` には `CalendarService`（カレンダーの参照・作成）と `TodoService`（Todo の参照・作成・更新・状態変更・削除）を含めます。
+`limani.v1` には `CalendarService`（カレンダーの参照・作成）と `TodoService`（Todo の参照・作成・更新・状態変更・削除と、Todo をほかのカレンダーにも出すリンク（イベント間の同期）の参照・作成・削除）を含めます。
 アプリパスワードなど画面専用の API は、limani の private proto にあり、ここには含めません。
 
 ## Layout
