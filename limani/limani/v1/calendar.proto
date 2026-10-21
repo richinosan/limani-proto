@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Calendar は Todo（VTODO）をまとめるカレンダー（タスクリスト）。
+// vitrina の準備会（organization）ごと、またはイベントごとに作る。
+message Calendar {
+  // リソース名（calendars/{id}）。
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 属する vitrina のリソース名（organizations/{id} または events/{id}）。
+  string scope = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 表示名。
+  string display_name = 3 [(google.api.field_behavior) = REQUIRED];
+  // 表示色（#RRGGBB 形式）。未設定なら空。
+  string color = 4 [(google.api.field_behavior) = OPTIONAL];
+  // 書き込みのたびに増える連番。CalDAV の差分同期（RFC 6578）に使う。
+  int64 sync_token = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 作成時刻。
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 更新時刻。
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
