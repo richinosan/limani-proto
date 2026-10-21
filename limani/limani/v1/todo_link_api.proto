@@ -22,7 +22,8 @@ message ListTodoLinksResponse {
 
 // CreateTodoLinkRequest は、Todo をほかのカレンダーにもリンクする。
 //
-// 呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方のメンバーである必要がある。
+// 呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方で書き込み権限を持つメンバーである必要がある。
+// リンク先のメンバーでなければ NOT_FOUND、書き込み権限がなければ PERMISSION_DENIED。
 // リンク先のカレンダーに同じ UID の Todo がすでにある場合と、Todo がすでにそのカレンダーに出ている場合は、
 // ALREADY_EXISTS を返す。
 // リンク先のカレンダーの CalDAV クライアントには、次の同期で Todo が現れる。
@@ -35,7 +36,8 @@ message CreateTodoLinkRequest {
 
 // DeleteTodoLinkRequest は、Todo をカレンダーから外す（同期をやめる。リンクを削除する）。
 //
-// 呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方のメンバーである必要がある。
+// 呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方で書き込み権限を持つメンバーである必要がある。
+// 書き込み権限がなければ PERMISSION_DENIED。
 // 外したカレンダーの CalDAV クライアントには、次の同期で Todo が削除として伝わる（削除の記録を残す）。
 // ほかのカレンダーには Todo が残る。Todo が出ているカレンダーが 1 つだけのときは外せない（FAILED_PRECONDITION）。
 // そのときは Todo を削除する。

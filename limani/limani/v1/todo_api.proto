@@ -68,7 +68,7 @@ message SetTodoStatusRequest {
 // DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
 //
 // Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で指定しても同じ。
-// 呼び出し元がそのカレンダーのメンバーである必要がある）。
+// 呼び出し元がそのカレンダーの書き込み権限を持つメンバーである必要がある）。
 // 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
 message DeleteTodoRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
