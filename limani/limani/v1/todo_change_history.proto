@@ -53,4 +53,10 @@ message TodoChangeHistory {
   Todo snapshot = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 変更した時刻。
   google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // この変更と同時に書かれたコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  // CreateTodoCommentRequest.status で状態を変えたときだけ入る（GitHub の "Close with comment" の、状態の変更の側）。
+  // 画面は、このコメントが一覧にあれば、状態の変更を履歴の側では出さない（コメントが同じ出来事を示すため）。
+  // コメントを削除しても、この値は残る（指すコメントはもうない）。コメントと同時でない変更は空。
+  // {calendar} は、問い合わせたカレンダーのもの。
+  string comment = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
