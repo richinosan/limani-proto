@@ -27,6 +27,15 @@
     - [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest)
     - [UpdateTodoRequest](#limani-v1-UpdateTodoRequest)
   
+- [limani/v1/todo_link.proto](#limani_v1_todo_link-proto)
+    - [TodoLink](#limani-v1-TodoLink)
+  
+- [limani/v1/todo_link_api.proto](#limani_v1_todo_link_api-proto)
+    - [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest)
+    - [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest)
+    - [ListTodoLinksRequest](#limani-v1-ListTodoLinksRequest)
+    - [ListTodoLinksResponse](#limani-v1-ListTodoLinksResponse)
+  
 - [limani/v1/api.proto](#limani_v1_api-proto)
     - [CalendarService](#limani-v1-CalendarService)
     - [TodoService](#limani-v1-TodoService)
@@ -174,8 +183,8 @@ Todo は VTODO 1件。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。 UID は任意の文字列（URL や「/」を含むこともある）なので、リソース名には使わない。 |
-| uid | [string](#string) |  | iCalendar の UID。カレンダー内で一意。作成時に省略するとサーバーが決める。 UID から Todo を探すときは ListTodos の uid で絞り込む。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。 UID は任意の文字列（URL や「/」を含むこともある）なので、リソース名には使わない。 {calendar} には、Todo が出ているカレンダー（TodoLink）のどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じ Todo でも、カレンダーごとに name が違う）。 |
+| uid | [string](#string) |  | iCalendar の UID。カレンダー内で一意（リンクされた Todo を含む）。作成時に省略するとサーバーが決める。 UID から Todo を探すときは ListTodos の uid で絞り込む。 |
 | summary | [string](#string) |  | SUMMARY。必須。 |
 | description | [string](#string) |  | DESCRIPTION。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  | STATUS。作成時に未指定なら NEEDS-ACTION。 |
@@ -185,13 +194,14 @@ Todo は VTODO 1件。
 | due | [TodoDateTime](#limani-v1-TodoDateTime) |  | DUE。未設定なら省略。dtstart より前にできず、dtstart と all_day をそろえる。 |
 | completed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | COMPLETED。status が COMPLETED になると、未指定ならサーバーが現在時刻を入れる。 |
 | categories | [string](#string) | repeated | CATEGORIES。 |
-| parent_uid | [string](#string) |  | 親の Todo の UID（RELATED-TO;RELTYPE=PARENT）。 |
-| assignees | [string](#string) | repeated | 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。 |
+| parent_uid | [string](#string) |  | 親の Todo の UID（RELATED-TO;RELTYPE=PARENT）。 親は、書き込みに使ったカレンダーの中で UID から探す（Todo が出ているカレンダーごとに、親の Todo が出ているとは限らない。 親がそのカレンダーに出ていなければ、そのカレンダーからは親が見つからない）。 |
+| assignees | [string](#string) | repeated | 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。 返すのは、Todo が出ているすべてのカレンダーのメンバーのうち、いまメンバーである人だけ。 |
 | sequence | [int32](#int32) |  | SEQUENCE。更新のたびに増える。 |
 | etag | [string](#string) |  | 楽観的排他制御のための値。CalDAV の ETag と同じ。 UpdateTodo で指定すると、保存されている値と違うときに ABORTED を返す。 |
 | ics | [string](#string) |  | VCALENDAR 全文（RFC 5545）。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。 |
+| calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
 
 
 
@@ -267,6 +277,10 @@ CreateTodoRequest は Todo を作る。
 ### DeleteTodoRequest
 DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
 
+Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で指定しても同じ。
+呼び出し元がそのカレンダーのメンバーである必要がある）。
+1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -297,6 +311,7 @@ GetTodoRequest は Todo を取得する。
 
 ### ListTodosRequest
 ListTodosRequest はカレンダー内の Todo を一覧する。
+TodoLink で同期されている Todo も含めて返す。
 
 
 | Field | Type | Label | Description |
@@ -359,8 +374,137 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| todo | [Todo](#limani-v1-Todo) |  | 更新する Todo。name で対象を決める。 |
+| todo | [Todo](#limani-v1-Todo) |  | 更新する Todo。name で対象を決める。Todo が出ているカレンダーのどの name でもよく、 どのカレンダーから更新しても、Todo が出ているすべてのカレンダーに反映される。 |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。次のどれか: summary, description, status, priority, percent_complete, dtstart, due, completed_time, categories, parent_uid, assignees。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_link-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_link.proto
+
+
+
+<a name="limani-v1-TodoLink"></a>
+
+### TodoLink
+TodoLink は、Todo が表示されているカレンダーとの関係（イベント間の同期）。
+
+Todo は 1 件だけ保存され、複数のカレンダーに出る（コピーはしない）。
+どのカレンダーの一覧・CalDAV にも同じ Todo が出て、どのカレンダーから編集しても同じ Todo が更新される。
+「持ち主のカレンダー」はない。Todo が出ているカレンダーは、すべて TodoLink で表される。
+Todo を削除すると、すべてのカレンダーから消える。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/links/{link}）。 {link} は表示先のカレンダーの ID（calendar の calendars/{id} の {id}）。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 |
+| calendar | [string](#string) |  | Todo を表示するカレンダー（calendars/{id}）。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Todo がこのカレンダーに出た時刻（Todo を作った時刻、またはリンクを作った時刻）。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_link_api-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_link_api.proto
+
+
+
+<a name="limani-v1-CreateTodoLinkRequest"></a>
+
+### CreateTodoLinkRequest
+CreateTodoLinkRequest は、Todo をほかのカレンダーにもリンクする。
+
+呼び出し元が、parent のカレンダーとリンク先のカレンダーの両方のメンバーである必要がある。
+リンク先のカレンダーに同じ UID の Todo がすでにある場合と、Todo がすでにそのカレンダーに出ている場合は、
+ALREADY_EXISTS を返す。
+リンク先のカレンダーの CalDAV クライアントには、次の同期で Todo が現れる。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+| todo_link | [TodoLink](#limani-v1-TodoLink) |  | 作るリンク。calendar は必須（リンク先のカレンダー）。name・create_time は無視する。 |
+
+
+
+
+
+
+<a name="limani-v1-DeleteTodoLinkRequest"></a>
+
+### DeleteTodoLinkRequest
+DeleteTodoLinkRequest は、Todo をカレンダーから外す（同期をやめる。リンクを削除する）。
+
+呼び出し元が、name のカレンダー（{calendar}）と外すカレンダー（{link}）の両方のメンバーである必要がある。
+外したカレンダーの CalDAV クライアントには、次の同期で Todo が削除として伝わる（削除の記録を残す）。
+ほかのカレンダーには Todo が残る。Todo が出ているカレンダーが 1 つだけのときは外せない（FAILED_PRECONDITION）。
+そのときは Todo を削除する。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/links/{link}）。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoLinksRequest"></a>
+
+### ListTodoLinksRequest
+ListTodoLinksRequest は、Todo が出ているカレンダーを一覧する。
+1 つの Todo は 50 のカレンダーまでなので、ページングはしない。
+
+呼び出し元が parent のカレンダーのメンバーである必要がある。
+ほかのカレンダーのメンバーでなくても、Todo が出ているカレンダーの ID は返る。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+
+
+
+
+
+
+<a name="limani-v1-ListTodoLinksResponse"></a>
+
+### ListTodoLinksResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_links | [TodoLink](#limani-v1-TodoLink) | repeated | カレンダーの ID の昇順。 |
 
 
 
@@ -410,12 +554,15 @@ TodoService は Todo（VTODO）の API。
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| ListTodos | [ListTodosRequest](#limani-v1-ListTodosRequest) | [ListTodosResponse](#limani-v1-ListTodosResponse) |  |
+| ListTodos | [ListTodosRequest](#limani-v1-ListTodosRequest) | [ListTodosResponse](#limani-v1-ListTodosResponse) | カレンダーに出ている Todo を一覧する（TodoLink で同期されている Todo を含む）。 |
 | GetTodo | [GetTodoRequest](#limani-v1-GetTodoRequest) | [Todo](#limani-v1-Todo) |  |
 | CreateTodo | [CreateTodoRequest](#limani-v1-CreateTodoRequest) | [Todo](#limani-v1-Todo) |  |
 | UpdateTodo | [UpdateTodoRequest](#limani-v1-UpdateTodoRequest) | [Todo](#limani-v1-Todo) |  |
 | SetTodoStatus | [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest) | [Todo](#limani-v1-Todo) |  |
-| DeleteTodo | [DeleteTodoRequest](#limani-v1-DeleteTodoRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| DeleteTodo | [DeleteTodoRequest](#limani-v1-DeleteTodoRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo を削除する。Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で呼んでも同じ）。 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。 |
+| ListTodoLinks | [ListTodoLinksRequest](#limani-v1-ListTodoLinksRequest) | [ListTodoLinksResponse](#limani-v1-ListTodoLinksResponse) | Todo が出ているカレンダーを一覧する。 |
+| CreateTodoLink | [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest) | [TodoLink](#limani-v1-TodoLink) | Todo をほかのカレンダーにもリンクする（イベント間の同期）。 |
+| DeleteTodoLink | [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。 |
 
  
 

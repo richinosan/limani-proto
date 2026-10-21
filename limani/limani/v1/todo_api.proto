@@ -7,6 +7,7 @@ import "google/protobuf/field_mask.proto";
 import "limani/v1/todo.proto";
 
 // ListTodosRequest はカレンダー内の Todo を一覧する。
+// TodoLink で同期されている Todo も含めて返す。
 message ListTodosRequest {
   // 親（calendars/{id}）。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
@@ -43,7 +44,8 @@ message CreateTodoRequest {
 // todo.etag を指定すると、保存されている etag と違うときに ABORTED を返す。
 // 空なら競合を検出しない。
 message UpdateTodoRequest {
-  // 更新する Todo。name で対象を決める。
+  // 更新する Todo。name で対象を決める。Todo が出ているカレンダーのどの name でもよく、
+  // どのカレンダーから更新しても、Todo が出ているすべてのカレンダーに反映される。
   Todo todo = 1 [(google.api.field_behavior) = REQUIRED];
   // 更新するフィールド。次のどれか:
   // summary, description, status, priority, percent_complete,
@@ -64,6 +66,10 @@ message SetTodoStatusRequest {
 }
 
 // DeleteTodoRequest は Todo を削除する。削除の記録（tombstone）を残す。
+//
+// Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で指定しても同じ。
+// 呼び出し元がそのカレンダーのメンバーである必要がある）。
+// 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
 message DeleteTodoRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
