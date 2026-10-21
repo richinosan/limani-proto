@@ -632,7 +632,7 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | author_image_url | [string](#string) |  | 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 本文を最後に直した時刻。直していなければ create_time と同じ。 |
-| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 |
+| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
 
 
 
@@ -713,6 +713,7 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
 | page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。 |
 | page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
+| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | 指定すると、TodoComment.status_change がこの値のコメントだけを返す（並び順・ページングは同じ）。 たとえば TODO_STATUS_COMPLETED を指定すると、完了報告だけを取り出せる。 TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。 page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
 
 
 
