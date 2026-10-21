@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/protobuf/empty.proto";
+import "limani/v1/calendar.proto";
+import "limani/v1/calendar_api.proto";
+import "limani/v1/todo.proto";
+import "limani/v1/todo_api.proto";
+
+// CalendarService はカレンダー（タスクリスト）の API。
+// 認証は kebab のアクセストークン（Authorization: Bearer）。
+service CalendarService {
+  // 呼び出し元がメンバーであるカレンダーを一覧する。
+  rpc ListCalendars(ListCalendarsRequest) returns (ListCalendarsResponse);
+  rpc GetCalendar(GetCalendarRequest) returns (Calendar);
+  rpc CreateCalendar(CreateCalendarRequest) returns (Calendar);
+}
+
+// TodoService は Todo（VTODO）の API。
+// 認証は kebab のアクセストークン（Authorization: Bearer）。
+service TodoService {
+  rpc ListTodos(ListTodosRequest) returns (ListTodosResponse);
+  rpc GetTodo(GetTodoRequest) returns (Todo);
+  rpc CreateTodo(CreateTodoRequest) returns (Todo);
+  rpc UpdateTodo(UpdateTodoRequest) returns (Todo);
+  rpc SetTodoStatus(SetTodoStatusRequest) returns (Todo);
+  rpc DeleteTodo(DeleteTodoRequest) returns (google.protobuf.Empty);
+}
