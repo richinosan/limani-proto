@@ -446,7 +446,7 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。 |
-| body | [string](#string) |  | 本文（プレーンテキスト。改行を含められる）。 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。 |
+| body | [string](#string) |  | 本文。GitHub Flavored Markdown（GFM）として表示する。サーバーは Markdown を解釈せず、そのまま保存して返す （表示する側で HTML に変換し、サニタイズすること）。 改行（CRLF・CR）は LF にそろえ、前後の空白・改行を取り除いて保存する。取り除いたあとが空なら INVALID_ARGUMENT。 必須で、10000 文字（Unicode のコードポイント）まで。制御文字（改行とタブを除く）は使えない。 |
 | author | [string](#string) |  | 書いた人の kebab のユーザー ID（Todo.assignees と同じ形式）。 書いた人がカレンダーのメンバーから外れても、コメントは返る。 |
 | author_display_name | [string](#string) |  | 書いた人の表示名。kebab のプロフィールの表示名（なければ username）を、書いた時刻（本文を直した時刻）に写したもの。 書いたときにプロフィールを取得できなかったときは空。直したときに取得できなかったときは、前の値のまま。 |
 | author_image_url | [string](#string) |  | 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。 |
