@@ -15,6 +15,10 @@ import "limani/v1/todo.proto";
 // コメントは iCalendar（RFC 5545）には含まれない。Todo の ics・raw_ics には書かず、CalDAV にも出さない。
 // コメントを書く・直す・消すことで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
 // CalDAV クライアントが書いた COMMENT プロパティは ics にそのまま残り、TodoComment とは無関係。
+//
+// コメントは、Todo の書き込み権限のあるメンバーが「ピン留め」できる（PinTodoComment・UnpinTodoComment）。
+// ピン留めしたコメントは、画面で Todo の上のほうに固定して見せるためのもの（大事な決定・連絡先・手順など）。
+// ピン留めは Todo に属する（Todo が出ているすべてのカレンダーで共有する）。コメントを消すと、ピン留めも消える。
 message TodoComment {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
@@ -45,4 +49,11 @@ message TodoComment {
   // TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。
   // ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。
   TodoStatus status_change = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // ピン留めした時刻。ピン留めされていなければ未設定。
+  // PinTodoComment で入り、UnpinTodoComment で消える。すでにピン留めされているコメントにもう一度 PinTodoComment を呼んでも変わらない。
+  // 本文を直しても変わらない。ListTodoCommentsRequest.pinned_only でピン留めされたコメントだけを一覧できる。
+  google.protobuf.Timestamp pin_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // ピン留めした人の kebab のユーザー ID（author と同じ形式）。ピン留めされていなければ空。
+  // ピン留めした人がカレンダーのメンバーから外れても、そのまま返る。
+  string pinned_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

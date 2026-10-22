@@ -23,6 +23,10 @@ message ListTodoCommentsRequest {
   // TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。
   // page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。
   TodoStatus status_change = 4 [(google.api.field_behavior) = OPTIONAL];
+  // true なら、ピン留めされているコメント（TodoComment.pin_time が設定されているもの）だけを返す（並び順・ページングは同じ）。
+  // false（または省略）なら絞り込まない。status_change と同時に指定すると、両方に合うものだけを返す。
+  // page_token は、同じ status_change・pinned_only の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。
+  bool pinned_only = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListTodoCommentsResponse {
@@ -47,7 +51,8 @@ message CreateTodoCommentRequest {
   // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
   // 作るコメント。status を指定しないときは body が必須。
-  // name・author・author_display_name・author_image_url・create_time・update_time・status_change は無視する。
+  // name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する
+  // （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。
   TodoComment todo_comment = 2 [(google.api.field_behavior) = REQUIRED];
   // コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。
   // 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。
@@ -60,6 +65,7 @@ message CreateTodoCommentRequest {
 // 直せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
 message UpdateTodoCommentRequest {
   // 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。
+  // body 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。
   TodoComment todo_comment = 1 [(google.api.field_behavior) = REQUIRED];
   // 更新するフィールド。指定できるのは body だけ。空なら body を更新する。
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
@@ -69,6 +75,29 @@ message UpdateTodoCommentRequest {
 //
 // 消せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
 message DeleteTodoCommentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// PinTodoCommentRequest は、コメントをピン留めする（Todo の上のほうに固定して見せるための印を付ける）。
+//
+// 呼び出し元が name のカレンダーの書き込み権限のあるメンバーである必要がある（読み取りだけのメンバーは PERMISSION_DENIED）。
+// 誰が書いたコメントでもピン留めできる（書いた人でなくてもよい）。
+// すでにピン留めされているコメントには何もせず、今の値を返す（pin_time・pinned_by は変えない）。
+// 1 つの Todo にピン留めできるコメントは 10 件まで（超えると RESOURCE_EXHAUSTED）。
+// ピン留めは、Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time を変えない。
+message PinTodoCommentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// UnpinTodoCommentRequest は、コメントのピン留めを外す。
+//
+// 呼び出し元が name のカレンダーの書き込み権限のあるメンバーである必要がある（読み取りだけのメンバーは PERMISSION_DENIED）。
+// ピン留めした人でなくても外せる。ピン留めされていないコメントには何もせず、今の値を返す。
+// ピン留めを外しても、コメントは消えない。Todo の etag・sequence・update_time、カレンダーの sync_token、
+// コメントの update_time は変わらない。
+message UnpinTodoCommentRequest {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
