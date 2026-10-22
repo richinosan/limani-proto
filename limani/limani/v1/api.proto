@@ -53,6 +53,11 @@ service TodoService {
   rpc UpdateTodoComment(UpdateTodoCommentRequest) returns (TodoComment);
   // コメントを削除する。書いた人だけができる。
   rpc DeleteTodoComment(DeleteTodoCommentRequest) returns (google.protobuf.Empty);
+  // コメントをピン留めする。Todo の書き込み権限のあるメンバーなら、誰が書いたコメントでもできる。
+  // すでにピン留めされていれば何もせず今の値を返す。1 つの Todo に 10 件まで。Todo の etag・sequence・update_time は変わらない。
+  rpc PinTodoComment(PinTodoCommentRequest) returns (TodoComment);
+  // コメントのピン留めを外す。Todo の書き込み権限のあるメンバーならできる。ピン留めされていなければ何もせず今の値を返す。
+  rpc UnpinTodoComment(UnpinTodoCommentRequest) returns (TodoComment);
   // Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。
   rpc CreateTodoAttachment(CreateTodoAttachmentRequest) returns (TodoAttachment);
   // Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。
