@@ -12,6 +12,8 @@ import "limani/v1/todo_attachment_api.proto";
 import "limani/v1/todo_change_history_api.proto";
 import "limani/v1/todo_comment.proto";
 import "limani/v1/todo_comment_api.proto";
+import "limani/v1/todo_completion_ticket.proto";
+import "limani/v1/todo_completion_ticket_api.proto";
 import "limani/v1/todo_link.proto";
 import "limani/v1/todo_link_api.proto";
 
@@ -67,4 +69,14 @@ service TodoService {
   // Todo の変更履歴を新しい順に一覧する。変更のたびに、変更後の Todo（snapshot）・変えた人・経路（API か CalDAV か）を残す。
   // 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。
   rpc ListTodoChangeHistories(ListTodoChangeHistoriesRequest) returns (ListTodoChangeHistoriesResponse);
+  // Todo の完了チケットを発行する。あとで RedeemTodoCompletionTicket で、利用者のトークンなしに Todo を完了報告つきで完了にできる
+  // （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る。
+  rpc CreateTodoCompletionTicket(CreateTodoCompletionTicketRequest) returns (TodoCompletionTicket);
+}
+
+// TodoCompletionTicketService は、完了チケットを引き換える API。
+// 認証はチケットの secret で、kebab のアクセストークンは要らない（利用者のいない無人の処理から呼ぶため）。
+service TodoCompletionTicketService {
+  // 完了チケットを引き換えて、Todo を COMPLETED にし、発行した人の名前で完了報告を書く。
+  rpc RedeemTodoCompletionTicket(RedeemTodoCompletionTicketRequest) returns (TodoComment);
 }
