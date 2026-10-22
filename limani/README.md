@@ -56,6 +56,8 @@
     - [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest)
     - [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest)
     - [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse)
+    - [PinTodoCommentRequest](#limani-v1-PinTodoCommentRequest)
+    - [UnpinTodoCommentRequest](#limani-v1-UnpinTodoCommentRequest)
     - [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest)
   
 - [limani/v1/todo_link.proto](#limani_v1_todo_link-proto)
@@ -745,6 +747,10 @@ Todo を削除すると、コメントもすべて消える。TodoLink を外し
 コメントを書く・直す・消すことで、Todo の etag・sequence・update_time、カレンダーの sync_token は変わらない。
 CalDAV クライアントが書いた COMMENT プロパティは ics にそのまま残り、TodoComment とは無関係。
 
+コメントは、Todo の書き込み権限のあるメンバーが「ピン留め」できる（PinTodoComment・UnpinTodoComment）。
+ピン留めしたコメントは、画面で Todo の上のほうに固定して見せるためのもの（大事な決定・連絡先・手順など）。
+ピン留めは Todo に属する（Todo が出ているすべてのカレンダーで共有する）。コメントを消すと、ピン留めも消える。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -756,6 +762,8 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 本文を最後に直した時刻。直していなければ create_time と同じ。 |
 | status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
+| pin_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | ピン留めした時刻。ピン留めされていなければ未設定。 PinTodoComment で入り、UnpinTodoComment で消える。すでにピン留めされているコメントにもう一度 PinTodoComment を呼んでも変わらない。 本文を直しても変わらない。ListTodoCommentsRequest.pinned_only でピン留めされたコメントだけを一覧できる。 |
+| pinned_by | [string](#string) |  | ピン留めした人の kebab のユーザー ID（author と同じ形式）。ピン留めされていなければ空。 ピン留めした人がカレンダーのメンバーから外れても、そのまま返る。 |
 
 
 
@@ -797,7 +805,7 @@ COMPLETED から別の状態に戻すと completed_time が消える）ので、
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。 name・author・author_display_name・author_image_url・create_time・update_time・status_change は無視する。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。 name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  | コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。 今の状態と同じでもよい（SetTodoStatus と同じく Todo は書き直され、コメントが status_change つきで書かれる）。 |
 
 
@@ -837,6 +845,7 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 | page_size | [int32](#int32) |  | 1 ページの件数。0 以下なら 50。200 を超える値は 200 にする。 |
 | page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
 | status_change | [TodoStatus](#limani-v1-TodoStatus) |  | 指定すると、TodoComment.status_change がこの値のコメントだけを返す（並び順・ページングは同じ）。 たとえば TODO_STATUS_COMPLETED を指定すると、完了報告だけを取り出せる。 TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。 page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
+| pinned_only | [bool](#bool) |  | true なら、ピン留めされているコメント（TodoComment.pin_time が設定されているもの）だけを返す（並び順・ページングは同じ）。 false（または省略）なら絞り込まない。status_change と同時に指定すると、両方に合うものだけを返す。 page_token は、同じ status_change・pinned_only の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
 
 
 
@@ -859,6 +868,47 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 
 
 
+<a name="limani-v1-PinTodoCommentRequest"></a>
+
+### PinTodoCommentRequest
+PinTodoCommentRequest は、コメントをピン留めする（Todo の上のほうに固定して見せるための印を付ける）。
+
+呼び出し元が name のカレンダーの書き込み権限のあるメンバーである必要がある（読み取りだけのメンバーは PERMISSION_DENIED）。
+誰が書いたコメントでもピン留めできる（書いた人でなくてもよい）。
+すでにピン留めされているコメントには何もせず、今の値を返す（pin_time・pinned_by は変えない）。
+1 つの Todo にピン留めできるコメントは 10 件まで（超えると RESOURCE_EXHAUSTED）。
+ピン留めは、Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time を変えない。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 |
+
+
+
+
+
+
+<a name="limani-v1-UnpinTodoCommentRequest"></a>
+
+### UnpinTodoCommentRequest
+UnpinTodoCommentRequest は、コメントのピン留めを外す。
+
+呼び出し元が name のカレンダーの書き込み権限のあるメンバーである必要がある（読み取りだけのメンバーは PERMISSION_DENIED）。
+ピン留めした人でなくても外せる。ピン留めされていないコメントには何もせず、今の値を返す。
+ピン留めを外しても、コメントは消えない。Todo の etag・sequence・update_time、カレンダーの sync_token、
+コメントの update_time は変わらない。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 |
+
+
+
+
+
+
 <a name="limani-v1-UpdateTodoCommentRequest"></a>
 
 ### UpdateTodoCommentRequest
@@ -869,7 +919,7 @@ UpdateTodoCommentRequest は、コメントの本文を直す。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 body 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。 |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。指定できるのは body だけ。空なら body を更新する。 |
 
 
@@ -1064,6 +1114,8 @@ TodoService は Todo（VTODO）の API。
 | CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。 |
 | UpdateTodoComment | [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントの本文を直す。書いた人だけができる。 |
 | DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。 |
+| PinTodoComment | [PinTodoCommentRequest](#limani-v1-PinTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントをピン留めする。Todo の書き込み権限のあるメンバーなら、誰が書いたコメントでもできる。 すでにピン留めされていれば何もせず今の値を返す。1 つの Todo に 10 件まで。Todo の etag・sequence・update_time は変わらない。 |
+| UnpinTodoComment | [UnpinTodoCommentRequest](#limani-v1-UnpinTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントのピン留めを外す。Todo の書き込み権限のあるメンバーならできる。ピン留めされていなければ何もせず今の値を返す。 |
 | CreateTodoAttachment | [CreateTodoAttachmentRequest](#limani-v1-CreateTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。 |
 | ListTodoAttachments | [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest) | [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse) | Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
 | GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |
