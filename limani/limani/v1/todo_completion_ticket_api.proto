@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package limani.v1;
+
+import "google/api/field_behavior.proto";
+
+// CreateTodoCompletionTicketRequest は、Todo の完了チケットを発行する。
+//
+// 認証は kebab のアクセストークン。呼び出し元が Todo の書き込み権限を持つ必要がある
+// （読み取りだけのメンバーは PERMISSION_DENIED、メンバーでなければ NOT_FOUND）。
+// 発行しても Todo は変わらない（etag・sequence・update_time、カレンダーの sync_token も変わらない）。
+// 1 つの Todo に対して、引き換えていない有効なチケットは 1000 枚まで（超えると RESOURCE_EXHAUSTED）。
+message CreateTodoCompletionTicketRequest {
+  // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// RedeemTodoCompletionTicketRequest は、完了チケットを引き換えて、Todo を完了報告つきで完了にする。
+//
+// 認証は secret だけで、kebab のトークンは要らない（付けても無視する）。
+// CreateTodoCommentRequest に status = TODO_STATUS_COMPLETED を付けて書いたのと同じになる
+// （すでに COMPLETED の Todo でもよい）。コメントの書いた人は、チケットを発行した人。
+// 表示名・アイコンは、発行したときに kebab のプロフィールから写したもの。
+//
+// 引き換えるときにも、発行した人がまだ Todo の書き込み権限を持っているかを確かめる
+// （カレンダーのメンバーの写しで判定する。権限がなくなっていれば PERMISSION_DENIED で、何も書かない）。
+//
+// - secret が違う・期限切れ: NOT_FOUND
+// - Todo が削除された: NOT_FOUND
+// - 引き換え済み: 最初に書いた完了報告を返し、何もしない（失敗したときに再試行してよい）。
+//   その完了報告が削除されていれば FAILED_PRECONDITION。
+message RedeemTodoCompletionTicketRequest {
+  // CreateTodoCompletionTicket が返した TodoCompletionTicket.secret。
+  string secret = 1 [(google.api.field_behavior) = REQUIRED];
+  // 完了報告の本文（GitHub Flavored Markdown）。TodoComment.body と同じ規則で、空にはできない。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+}

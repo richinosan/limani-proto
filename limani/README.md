@@ -58,6 +58,13 @@
     - [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse)
     - [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest)
   
+- [limani/v1/todo_completion_ticket.proto](#limani_v1_todo_completion_ticket-proto)
+    - [TodoCompletionTicket](#limani-v1-TodoCompletionTicket)
+  
+- [limani/v1/todo_completion_ticket_api.proto](#limani_v1_todo_completion_ticket_api-proto)
+    - [CreateTodoCompletionTicketRequest](#limani-v1-CreateTodoCompletionTicketRequest)
+    - [RedeemTodoCompletionTicketRequest](#limani-v1-RedeemTodoCompletionTicketRequest)
+  
 - [limani/v1/todo_link.proto](#limani_v1_todo_link-proto)
     - [TodoLink](#limani-v1-TodoLink)
   
@@ -69,6 +76,7 @@
   
 - [limani/v1/api.proto](#limani_v1_api-proto)
     - [CalendarService](#limani-v1-CalendarService)
+    - [TodoCompletionTicketService](#limani-v1-TodoCompletionTicketService)
     - [TodoService](#limani-v1-TodoService)
   
 - [Scalar Value Types](#scalar-value-types)
@@ -886,6 +894,114 @@ UpdateTodoCommentRequest は、コメントの本文を直す。
 
 
 
+<a name="limani_v1_todo_completion_ticket-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_completion_ticket.proto
+
+
+
+<a name="limani-v1-TodoCompletionTicket"></a>
+
+### TodoCompletionTicket
+TodoCompletionTicket は、あとで Todo を完了報告つきで完了にするための引換券（完了チケット）。
+
+pompe の予約投稿のように、利用者の kebab のトークンを持たない無人の処理から Todo を完了にするために使う。
+利用者がいるうち（投稿を保存したときなど）に、利用者のトークンで CreateTodoCompletionTicket を呼んで発行しておき、
+あとで処理が終わったときに secret を RedeemTodoCompletionTicket に渡して引き換える。
+
+引き換えると、Todo を COMPLETED にし、発行した人を書いた人として完了報告（status_change が COMPLETED のコメント）を書く。
+1 枚のチケットで書ける完了報告は 1 件だけ。同じ Todo に何枚でも発行でき、それぞれが別の完了報告になる。
+チケットは iCalendar・CalDAV には出ない。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/completionTickets/{ticket}）。{ticket} はサーバーが決める ID。 {calendar} は、発行したときに指定したカレンダー。 |
+| secret | [string](#string) |  | 引き換えに使う秘密の文字列。CreateTodoCompletionTicket の応答にだけ入る（サーバーはハッシュだけを保存する）。 持っている人は誰でも引き換えられるので、パスワードと同じく扱うこと。 |
+| issuer | [string](#string) |  | 発行した人の kebab のユーザー ID。引き換えたときの完了報告は、この人が書いたことになる。 |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 発行した時刻。 |
+| expire_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 有効期限。発行から 400 日。過ぎると引き換えられない。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="limani_v1_todo_completion_ticket_api-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## limani/v1/todo_completion_ticket_api.proto
+
+
+
+<a name="limani-v1-CreateTodoCompletionTicketRequest"></a>
+
+### CreateTodoCompletionTicketRequest
+CreateTodoCompletionTicketRequest は、Todo の完了チケットを発行する。
+
+認証は kebab のアクセストークン。呼び出し元が Todo の書き込み権限を持つ必要がある
+（読み取りだけのメンバーは PERMISSION_DENIED、メンバーでなければ NOT_FOUND）。
+発行しても Todo は変わらない（etag・sequence・update_time、カレンダーの sync_token も変わらない）。
+1 つの Todo に対して、引き換えていない有効なチケットは 1000 枚まで（超えると RESOURCE_EXHAUSTED）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
+
+
+
+
+
+
+<a name="limani-v1-RedeemTodoCompletionTicketRequest"></a>
+
+### RedeemTodoCompletionTicketRequest
+RedeemTodoCompletionTicketRequest は、完了チケットを引き換えて、Todo を完了報告つきで完了にする。
+
+認証は secret だけで、kebab のトークンは要らない（付けても無視する）。
+CreateTodoCommentRequest に status = TODO_STATUS_COMPLETED を付けて書いたのと同じになる
+（すでに COMPLETED の Todo でもよい）。コメントの書いた人は、チケットを発行した人。
+表示名・アイコンは、発行したときに kebab のプロフィールから写したもの。
+
+引き換えるときにも、発行した人がまだ Todo の書き込み権限を持っているかを確かめる
+（カレンダーのメンバーの写しで判定する。権限がなくなっていれば PERMISSION_DENIED で、何も書かない）。
+
+- secret が違う・期限切れ: NOT_FOUND
+- Todo が削除された: NOT_FOUND
+- 引き換え済み: 最初に書いた完了報告を返し、何もしない（失敗したときに再試行してよい）。
+  その完了報告が削除されていれば FAILED_PRECONDITION。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| secret | [string](#string) |  | CreateTodoCompletionTicket が返した TodoCompletionTicket.secret。 |
+| body | [string](#string) |  | 完了報告の本文（GitHub Flavored Markdown）。TodoComment.body と同じ規則で、空にはできない。 |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="limani_v1_todo_link-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1043,6 +1159,17 @@ CalendarService はカレンダー（タスクリスト）の API。
 | CreateCalendar | [CreateCalendarRequest](#limani-v1-CreateCalendarRequest) | [Calendar](#limani-v1-Calendar) |  |
 
 
+<a name="limani-v1-TodoCompletionTicketService"></a>
+
+### TodoCompletionTicketService
+TodoCompletionTicketService は、完了チケットを引き換える API。
+認証はチケットの secret で、kebab のアクセストークンは要らない（利用者のいない無人の処理から呼ぶため）。
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| RedeemTodoCompletionTicket | [RedeemTodoCompletionTicketRequest](#limani-v1-RedeemTodoCompletionTicketRequest) | [TodoComment](#limani-v1-TodoComment) | 完了チケットを引き換えて、Todo を COMPLETED にし、発行した人の名前で完了報告を書く。 |
+
+
 <a name="limani-v1-TodoService"></a>
 
 ### TodoService
@@ -1069,6 +1196,7 @@ TodoService は Todo（VTODO）の API。
 | GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |
 | DeleteTodoAttachment | [DeleteTodoAttachmentRequest](#limani-v1-DeleteTodoAttachmentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | 添付を削除する。アップロードした人だけができる。 |
 | ListTodoChangeHistories | [ListTodoChangeHistoriesRequest](#limani-v1-ListTodoChangeHistoriesRequest) | [ListTodoChangeHistoriesResponse](#limani-v1-ListTodoChangeHistoriesResponse) | Todo の変更履歴を新しい順に一覧する。変更のたびに、変更後の Todo（snapshot）・変えた人・経路（API か CalDAV か）を残す。 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。 |
+| CreateTodoCompletionTicket | [CreateTodoCompletionTicketRequest](#limani-v1-CreateTodoCompletionTicketRequest) | [TodoCompletionTicket](#limani-v1-TodoCompletionTicket) | Todo の完了チケットを発行する。あとで RedeemTodoCompletionTicket で、利用者のトークンなしに Todo を完了報告つきで完了にできる （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る。 |
 
  
 
