@@ -779,6 +779,11 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 ピン留めしたコメントは、画面で Todo の上のほうに固定して見せるためのもの（大事な決定・連絡先・手順など）。
 ピン留めは Todo に属する（Todo が出ているすべてのカレンダーで共有する）。コメントを消すと、ピン留めも消える。
 
+コメントでは、Todo が出ているカレンダーのメンバーを「メンション」できる（GitHub の @username と同じ）。
+本文に @username と書いたユーザーの kebab のユーザー ID を、書く側（クライアント）が mentions に入れて送る。
+サーバーは本文（Markdown）を解釈してメンションを見つけることはしない。mentions に入った人は、
+メンションされたことの通知（limani の NOTIFICATION_KIND_MENTIONED）を受け取る。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -792,6 +797,11 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 担当者が 2 人以上いて、書いた人の分だけが完了になったとき（Todo は COMPLETED にならない）も、 このコメントの status_change は TODO_STATUS_COMPLETED で、書いた人の分の完了報告になる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
 | pin_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | ピン留めした時刻。ピン留めされていなければ未設定。 PinTodoComment で入り、UnpinTodoComment で消える。すでにピン留めされているコメントにもう一度 PinTodoComment を呼んでも変わらない。 本文を直しても変わらない。ListTodoCommentsRequest.pinned_only でピン留めされたコメントだけを一覧できる。 |
 | pinned_by | [string](#string) |  | ピン留めした人の kebab のユーザー ID（author と同じ形式）。ピン留めされていなければ空。 ピン留めした人がカレンダーのメンバーから外れても、そのまま返る。 |
+| mentions | [string](#string) | repeated | 本文でメンションしたユーザーの kebab のユーザー ID（Todo.assignees と同じ形式）。OPTIONAL。 本文の @username に対応する ID を、クライアントが CreateTodoCommentRequest・UpdateTodoCommentRequest で設定する。 画面はこれを使って、本文の @username をメンションとして強調して見せられる。
+
+サーバーは保存するときに次のように整える（エラーにせず、黙って落とす）。 - 前後の空白を取り除き、空の要素と重複を落とす。 - Todo が出ているカレンダー（TodoLink）のどれかのメンバーでない ID を落とす （メンバーでない人にはメンションの通知を送らない。存在しない ID・書式の違う文字列も同じ）。 - 書いた人本人は残す（ただし、本人には通知しない）。 空の要素と重複を除いた数が 50 を超えると INVALID_ARGUMENT（メンバーかどうかで落とす前の数。 「mentions は 50 人以内にしてください」。Todo.assignees と同じ上限）。 返す値は整えたあとのもので、指定した値より少ないことがある。順は指定した順ではなく、kebab のユーザー ID の昇順。
+
+作成時（CreateTodoCommentRequest）は、指定したすべての人が（書いた人本人を除いて）メンションの通知を受け取る。 更新時（UpdateTodoCommentRequest）は、update_mask に mentions を含めたときだけ置き換わり（空なら全員外れる）、 通知を受け取るのは、直す前の mentions になかった人だけ（ほかの人には通知しない）。 一度メンションされた人は、その Todo の参加者になり、以降のコメントの通知（NOTIFICATION_KIND_COMMENTED）も受け取る。 メンションは Todo の etag・sequence・update_time、カレンダーの sync_token を変えず、iCalendar・CalDAV にも出ない。 CreateTodoCompletionTicket・RedeemTodoCompletionTicket で書くコメントでは、メンションできない（常に空）。 |
 
 
 
@@ -835,7 +845,7 @@ COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を�
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。 name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。mentions（メンションした人の kebab のユーザー ID）は任意。 mentions に入れた人（Todo が出ているカレンダーのメンバーだけ。それ以外は黙って落とす。50 人まで）は、書いた人本人を除いて、 メンションの通知を受け取る（メンションされた人には COMMENTED は送らない）。 name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  | コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。 今の状態と同じでもよい（SetTodoStatus と同じく Todo は書き直され、コメントが status_change つきで書かれる）。 |
 
 
@@ -949,8 +959,8 @@ UpdateTodoCommentRequest は、コメントの本文を直す。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 body 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。 |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。指定できるのは body だけ。空なら body を更新する。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。 |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。指定できるのは body と mentions。空なら body だけを更新する（mentions は変えない）。 mentions を指定すると、メンションした人をそっくり置き換える（todo_comment.mentions が空なら、全員外す）。 新しくメンションされた人（直す前の mentions になかった人。書いた人本人を除く）だけがメンションの通知を受け取り、 外れた人・そのまま残った人・ほかの人には、通知を送らない。 body を指定しないときは、todo_comment.body は無視する（本文は変わらない）。 |
 
 
 
