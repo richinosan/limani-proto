@@ -12,6 +12,7 @@ import "google/protobuf/timestamp.proto";
 // あとで処理が終わったときに secret を RedeemTodoCompletionTicket に渡して引き換える。
 //
 // 引き換えると、Todo を COMPLETED にし、発行した人を書いた人として完了報告（status_change が COMPLETED のコメント）を書く。
+// 発行した人が担当者の一人なら、その人の分の完了になる（全員の分がそろうまで Todo は COMPLETED にならない）。
 // 1 枚のチケットで書ける完了報告は 1 件だけ。同じ Todo に何枚でも発行でき、それぞれが別の完了報告になる。
 // チケットは iCalendar・CalDAV には出ない。
 message TodoCompletionTicket {

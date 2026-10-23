@@ -49,7 +49,16 @@ message UpdateTodoRequest {
   Todo todo = 1 [(google.api.field_behavior) = REQUIRED];
   // 更新するフィールド。次のどれか:
   // summary, description, status, priority, percent_complete,
-  // dtstart, due, completed_time, categories, parent_uid, assignees。
+  // dtstart, due, completed_time, categories, parent_uid, assignees, completed_assignees。
+  //
+  // completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける
+  // （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。
+  // 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる
+  // （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、
+  // COMPLETED だった Todo は IN_PROCESS に戻り（completed_time を消す）、NEEDS_ACTION だった Todo は IN_PROCESS になる。
+  // status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
+  //
+  // status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
@@ -57,6 +66,21 @@ message UpdateTodoRequest {
 //
 // COMPLETED にすると completed_time に現在時刻を入れ、percent_complete を 100 にする。
 // COMPLETED から戻すと completed_time を消す。
+//
+// 担当者ごとの完了: Todo.assignees が 2 人以上いるとき、呼び出した人（行為者）によって意味が変わる。
+// UpdateTodo の status、状態つきの CreateTodoComment、RedeemTodoCompletionTicket（行為者は発行者）、CalDAV の PUT も同じ規則になる。
+//
+// 1. COMPLETED にする:
+//    - 担当者がいない: Todo を COMPLETED にする。
+//    - 行為者が担当者の一人: 行為者の分だけを完了にする（completed_assignees に入れる）。全員の分がそろえば Todo を
+//      COMPLETED にする（上の completed_time と percent_complete）。そろわなければ status は COMPLETED にならず、
+//      NEEDS_ACTION なら IN_PROCESS になる（応答の status は IN_PROCESS）。
+//    - 行為者が担当者でない: 管理者の操作とみなし、全員の分を完了にして Todo を COMPLETED にする。
+// 2. COMPLETED から戻す:
+//    - 行為者が担当者の一人: 行為者の分だけを未完了に戻す。ほかの人の分は完了のまま。
+//    - 行為者が担当者でない: 全員の分を未完了に戻す。
+//
+// 担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
 message SetTodoStatusRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];

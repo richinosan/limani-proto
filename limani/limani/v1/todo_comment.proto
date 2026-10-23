@@ -47,6 +47,8 @@ message TodoComment {
   // 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。
   // 画面はこれを「完了にした」「再開した」などの出来事として表示できる。
   // TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。
+  // 担当者が 2 人以上いて、書いた人の分だけが完了になったとき（Todo は COMPLETED にならない）も、
+  // このコメントの status_change は TODO_STATUS_COMPLETED で、書いた人の分の完了報告になる。
   // ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。
   TodoStatus status_change = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // ピン留めした時刻。ピン留めされていなければ未設定。

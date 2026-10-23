@@ -31,7 +31,7 @@ enum TodoChangeSource {
 // コメント（TodoComment）・添付（TodoAttachment）の追加や削除も履歴に残さない。
 //
 // 中身（summary・description・status・priority・percent_complete・dtstart・due・completed_time・categories・
-// parent_uid・assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
+// parent_uid・assignees・completed_assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
 // PUT し直しても、履歴は増えない）。
 // 変更の内容は、隣り合う履歴の snapshot を比べて求める（サーバーは差分を持たない）。
 // 履歴を残し始める前に作られた Todo は、最も古い履歴が CREATE ではなく UPDATE になる。
