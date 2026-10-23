@@ -264,7 +264,8 @@ Todo は VTODO 1件。
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。 |
 | calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
 | creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
-| last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 |
+| last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 |
+| completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。 |
 
 
 
@@ -414,6 +415,21 @@ SetTodoStatusRequest は status だけを変える近道。
 COMPLETED にすると completed_time に現在時刻を入れ、percent_complete を 100 にする。
 COMPLETED から戻すと completed_time を消す。
 
+担当者ごとの完了: Todo.assignees が 2 人以上いるとき、呼び出した人（行為者）によって意味が変わる。
+UpdateTodo の status、状態つきの CreateTodoComment、RedeemTodoCompletionTicket（行為者は発行者）、CalDAV の PUT も同じ規則になる。
+
+1. COMPLETED にする:
+   - 担当者がいない: Todo を COMPLETED にする。
+   - 行為者が担当者の一人: 行為者の分だけを完了にする（completed_assignees に入れる）。全員の分がそろえば Todo を
+     COMPLETED にする（上の completed_time と percent_complete）。そろわなければ status は COMPLETED にならず、
+     NEEDS_ACTION なら IN_PROCESS になる（応答の status は IN_PROCESS）。
+   - 行為者が担当者でない: 管理者の操作とみなし、全員の分を完了にして Todo を COMPLETED にする。
+2. COMPLETED から戻す:
+   - 行為者が担当者の一人: 行為者の分だけを未完了に戻す。ほかの人の分は完了のまま。
+   - 行為者が担当者でない: 全員の分を未完了に戻す。
+
+担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -438,7 +454,11 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | todo | [Todo](#limani-v1-Todo) |  | 更新する Todo。name で対象を決める。Todo が出ているカレンダーのどの name でもよく、 どのカレンダーから更新しても、Todo が出ているすべてのカレンダーに反映される。 |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。次のどれか: summary, description, status, priority, percent_complete, dtstart, due, completed_time, categories, parent_uid, assignees。 |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。次のどれか: summary, description, status, priority, percent_complete, dtstart, due, completed_time, categories, parent_uid, assignees, completed_assignees。
+
+completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、 COMPLETED だった Todo は IN_PROCESS に戻り（completed_time を消す）、NEEDS_ACTION だった Todo は IN_PROCESS になる。 status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
+
+status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。 |
 
 
 
@@ -627,7 +647,7 @@ Todo を削除すると、履歴もすべて消える（削除は履歴に残さ
 コメント（TodoComment）・添付（TodoAttachment）の追加や削除も履歴に残さない。
 
 中身（summary・description・status・priority・percent_complete・dtstart・due・completed_time・categories・
-parent_uid・assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
+parent_uid・assignees・completed_assignees）が変わらない更新は、記録しない（CalDAV クライアントが DTSTAMP・SEQUENCE だけを変えて
 PUT し直しても、履歴は増えない）。
 変更の内容は、隣り合う履歴の snapshot を比べて求める（サーバーは差分を持たない）。
 履歴を残し始める前に作られた Todo は、最も古い履歴が CREATE ではなく UPDATE になる。
@@ -769,7 +789,7 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 | author_image_url | [string](#string) |  | 書いた人のアイコンの URL。author_display_name と同じ時点の写し。ないときは空。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 本文を最後に直した時刻。直していなければ create_time と同じ。 |
-| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
+| status_change | [TodoStatus](#limani-v1-TodoStatus) |  | このコメントと同時に変えた Todo の状態（GitHub の &#34;Close with comment&#34;）。 CreateTodoCommentRequest.status を指定して書いたコメントだけ入る（COMPLETED なら完了、NEEDS_ACTION・IN_PROCESS なら再開など）。 状態を変えていないコメントは TODO_STATUS_UNSPECIFIED。本文を直しても変わらない。 画面はこれを「完了にした」「再開した」などの出来事として表示できる。 TODO_STATUS_COMPLETED のコメントは「完了報告」（成果物・エビデンス）として、画面で目立たせる。 担当者が 2 人以上いて、書いた人の分だけが完了になったとき（Todo は COMPLETED にならない）も、 このコメントの status_change は TODO_STATUS_COMPLETED で、書いた人の分の完了報告になる。 ListTodoCommentsRequest.status_change で完了報告だけを一覧できる。 |
 | pin_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | ピン留めした時刻。ピン留めされていなければ未設定。 PinTodoComment で入り、UnpinTodoComment で消える。すでにピン留めされているコメントにもう一度 PinTodoComment を呼んでも変わらない。 本文を直しても変わらない。ListTodoCommentsRequest.pinned_only でピン留めされたコメントだけを一覧できる。 |
 | pinned_by | [string](#string) |  | ピン留めした人の kebab のユーザー ID（author と同じ形式）。ピン留めされていなければ空。 ピン留めした人がカレンダーのメンバーから外れても、そのまま返る。 |
 
@@ -807,6 +827,8 @@ status を指定すると、GitHub の &#34;Close with comment&#34; のように
 COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
 カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
 読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+担当者がいるときの COMPLETED は、コメントを書いた人（行為者）の分の完了になり、全員の分がそろわなければ Todo は
+COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を参照。コメントの status_change は COMPLETED のまま）。
 状態を変えられなかったときは、コメントも書かない。
 
 
@@ -961,6 +983,7 @@ pompe の予約投稿のように、利用者の kebab のトークンを持た�
 あとで処理が終わったときに secret を RedeemTodoCompletionTicket に渡して引き換える。
 
 引き換えると、Todo を COMPLETED にし、発行した人を書いた人として完了報告（status_change が COMPLETED のコメント）を書く。
+発行した人が担当者の一人なら、その人の分の完了になる（全員の分がそろうまで Todo は COMPLETED にならない）。
 1 枚のチケットで書ける完了報告は 1 件だけ。同じ Todo に何枚でも発行でき、それぞれが別の完了報告になる。
 チケットは iCalendar・CalDAV には出ない。
 
@@ -1022,6 +1045,8 @@ RedeemTodoCompletionTicketRequest は、完了チケットを引き換えて、T
 認証は secret だけで、kebab のトークンは要らない（付けても無視する）。
 CreateTodoCommentRequest に status = TODO_STATUS_COMPLETED を付けて書いたのと同じになる
 （すでに COMPLETED の Todo でもよい）。コメントの書いた人は、チケットを発行した人。
+完了にする行為者もチケットを発行した人で、発行した人が Todo の担当者の一人なら、その人の分だけが完了になる
+（全員の分がそろうまで Todo は COMPLETED にならない。SetTodoStatus の「担当者ごとの完了」を参照）。
 表示名・アイコンは、発行したときに kebab のプロフィールから写したもの。
 
 次の順に確かめる。

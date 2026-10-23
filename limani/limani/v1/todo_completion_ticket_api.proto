@@ -20,6 +20,8 @@ message CreateTodoCompletionTicketRequest {
 // 認証は secret だけで、kebab のトークンは要らない（付けても無視する）。
 // CreateTodoCommentRequest に status = TODO_STATUS_COMPLETED を付けて書いたのと同じになる
 // （すでに COMPLETED の Todo でもよい）。コメントの書いた人は、チケットを発行した人。
+// 完了にする行為者もチケットを発行した人で、発行した人が Todo の担当者の一人なら、その人の分だけが完了になる
+// （全員の分がそろうまで Todo は COMPLETED にならない。SetTodoStatus の「担当者ごとの完了」を参照）。
 // 表示名・アイコンは、発行したときに kebab のプロフィールから写したもの。
 //
 // 次の順に確かめる。
