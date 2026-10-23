@@ -52,7 +52,9 @@ message ListTodoCommentsResponse {
 message CreateTodoCommentRequest {
   // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
-  // 作るコメント。status を指定しないときは body が必須。
+  // 作るコメント。status を指定しないときは body が必須。mentions（メンションした人の kebab のユーザー ID）は任意。
+  // mentions に入れた人（Todo が出ているカレンダーのメンバーだけ。それ以外は黙って落とす。50 人まで）は、書いた人本人を除いて、
+  // メンションの通知を受け取る（メンションされた人には COMMENTED は送らない）。
   // name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する
   // （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。
   TodoComment todo_comment = 2 [(google.api.field_behavior) = REQUIRED];
@@ -67,9 +69,13 @@ message CreateTodoCommentRequest {
 // 直せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
 message UpdateTodoCommentRequest {
   // 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。
-  // body 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。
+  // body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。
   TodoComment todo_comment = 1 [(google.api.field_behavior) = REQUIRED];
-  // 更新するフィールド。指定できるのは body だけ。空なら body を更新する。
+  // 更新するフィールド。指定できるのは body と mentions。空なら body だけを更新する（mentions は変えない）。
+  // mentions を指定すると、メンションした人をそっくり置き換える（todo_comment.mentions が空なら、全員外す）。
+  // 新しくメンションされた人（直す前の mentions になかった人。書いた人本人を除く）だけがメンションの通知を受け取り、
+  // 外れた人・そのまま残った人・ほかの人には、通知を送らない。
+  // body を指定しないときは、todo_comment.body は無視する（本文は変わらない）。
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
