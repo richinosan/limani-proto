@@ -46,6 +46,8 @@ message ListTodoCommentsResponse {
 // COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
 // カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
 // 読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+// 担当者がいるときの COMPLETED は、コメントを書いた人（行為者）の分の完了になり、全員の分がそろわなければ Todo は
+// COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を参照。コメントの status_change は COMPLETED のまま）。
 // 状態を変えられなかったときは、コメントも書かない。
 message CreateTodoCommentRequest {
   // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。

@@ -85,8 +85,16 @@ message Todo {
   string creator = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。
   // UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・
-  // percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees）が実際に変わったときだけ更新する
+  // percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する
   // （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。
   // TodoChangeHistory の actor と対応する。
   string last_updater = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。
+  // 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで
+  // status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。
+  // 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき
+  // （COMPLETED の Todo では assignees の全員が入る）。
+  // assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。
+  // UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。
+  repeated string completed_assignees = 22;
 }
