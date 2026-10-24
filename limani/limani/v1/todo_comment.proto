@@ -19,6 +19,11 @@ import "limani/v1/todo.proto";
 // コメントは、Todo の書き込み権限のあるメンバーが「ピン留め」できる（PinTodoComment・UnpinTodoComment）。
 // ピン留めしたコメントは、画面で Todo の上のほうに固定して見せるためのもの（大事な決定・連絡先・手順など）。
 // ピン留めは Todo に属する（Todo が出ているすべてのカレンダーで共有する）。コメントを消すと、ピン留めも消える。
+//
+// コメントでは、Todo が出ているカレンダーのメンバーを「メンション」できる（GitHub の @username と同じ）。
+// 本文に @username と書いたユーザーの kebab のユーザー ID を、書く側（クライアント）が mentions に入れて送る。
+// サーバーは本文（Markdown）を解釈してメンションを見つけることはしない。mentions に入った人は、
+// メンションされたことの通知（limani の NOTIFICATION_KIND_MENTIONED）を受け取る。
 message TodoComment {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
@@ -58,4 +63,24 @@ message TodoComment {
   // ピン留めした人の kebab のユーザー ID（author と同じ形式）。ピン留めされていなければ空。
   // ピン留めした人がカレンダーのメンバーから外れても、そのまま返る。
   string pinned_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 本文でメンションしたユーザーの kebab のユーザー ID（Todo.assignees と同じ形式）。OPTIONAL。
+  // 本文の @username に対応する ID を、クライアントが CreateTodoCommentRequest・UpdateTodoCommentRequest で設定する。
+  // 画面はこれを使って、本文の @username をメンションとして強調して見せられる。
+  //
+  // サーバーは保存するときに次のように整える（エラーにせず、黙って落とす）。
+  //   - 前後の空白を取り除き、空の要素と重複を落とす。
+  //   - Todo が出ているカレンダー（TodoLink）のどれかのメンバーでない ID を落とす
+  //     （メンバーでない人にはメンションの通知を送らない。存在しない ID・書式の違う文字列も同じ）。
+  //   - 書いた人本人は残す（ただし、本人には通知しない）。
+  // 空の要素と重複を除いた数が 50 を超えると INVALID_ARGUMENT（メンバーかどうかで落とす前の数。
+  // 「mentions は 50 人以内にしてください」。Todo.assignees と同じ上限）。
+  // 返す値は整えたあとのもので、指定した値より少ないことがある。順は指定した順ではなく、kebab のユーザー ID の昇順。
+  //
+  // 作成時（CreateTodoCommentRequest）は、指定したすべての人が（書いた人本人を除いて）メンションの通知を受け取る。
+  // 更新時（UpdateTodoCommentRequest）は、update_mask に mentions を含めたときだけ置き換わり（空なら全員外れる）、
+  // 通知を受け取るのは、直す前の mentions になかった人だけ（ほかの人には通知しない）。
+  // 一度メンションされた人は、その Todo の参加者になり、以降のコメントの通知（NOTIFICATION_KIND_COMMENTED）も受け取る。
+  // メンションは Todo の etag・sequence・update_time、カレンダーの sync_token を変えず、iCalendar・CalDAV にも出ない。
+  // CreateTodoCompletionTicket・RedeemTodoCompletionTicket で書くコメントでは、メンションできない（常に空）。
+  repeated string mentions = 11 [(google.api.field_behavior) = OPTIONAL];
 }
