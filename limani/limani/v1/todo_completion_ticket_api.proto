@@ -8,6 +8,9 @@ import "google/api/field_behavior.proto";
 //
 // 認証は kebab のアクセストークン。呼び出し元が Todo の書き込み権限を持つ必要がある
 // （読み取りだけのメンバーは PERMISSION_DENIED、メンバーでなければ NOT_FOUND）。
+// ただし、読み取りだけのメンバーも、その Todo の担当者なら発行できる（レビューする人が自分の分を承認するため）。
+// そのチケットを引き換えると、完了になるのは発行した人の分だけ（SetTodoStatus の「閲覧のみのメンバーの自己申告」と同じ。
+// 全員の分がそろうまで Todo は COMPLETED にならない）。
 // 発行しても Todo は変わらない（etag・sequence・update_time、カレンダーの sync_token も変わらない）。
 // 1 つの Todo に対して、引き換えていない有効なチケットは 1000 枚まで（超えると RESOURCE_EXHAUSTED）。
 message CreateTodoCompletionTicketRequest {
@@ -31,7 +34,8 @@ message CreateTodoCompletionTicketRequest {
 //    （応答を受け取れなかったときに再試行してよい）。その完了報告が削除されていれば FAILED_PRECONDITION。
 // 3. 発行した人が、Todo が「今」出ているカレンダー（TodoLink）のどれかで、Todo の書き込み権限を持っていること
 //    （カレンダーのメンバーの写しで判定する）。発行したカレンダーとのリンクが外れていて、ほかのカレンダーでも
-//    書き込み権限がなければ PERMISSION_DENIED で、何も書かない。
+//    書き込み権限がなくても、そのカレンダーのメンバーのままで Todo の担当者なら、発行した人の分だけを完了にする。
+//    どちらでもなければ PERMISSION_DENIED で、何も書かない。
 // 4. Todo のコメントが上限（1000 件）に達していれば RESOURCE_EXHAUSTED で、何も書かない
 //    （チケットは引き換えていない扱いのまま残り、コメントが消されて枠が空けば、期限内なら引き換えられる）。
 //

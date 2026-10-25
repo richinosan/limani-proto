@@ -33,7 +33,11 @@ service TodoService {
   rpc ListTodos(ListTodosRequest) returns (ListTodosResponse);
   rpc GetTodo(GetTodoRequest) returns (Todo);
   rpc CreateTodo(CreateTodoRequest) returns (Todo);
+  // Todo を更新する。Todo の書き込み権限が要る。ただし、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
+  // update_mask が assignees・completed_assignees だけで、自分を担当者に足す・外す、自分の分の完了・取り消しだけを変えるときはできる。
   rpc UpdateTodo(UpdateTodoRequest) returns (Todo);
+  // Todo の状態だけを変える。Todo の書き込み権限が要る。ただし、閲覧のみのメンバーも、その Todo の担当者なら、COMPLETED にして
+  // 自分の分だけを完了にする・COMPLETED から戻して自分の分だけを取り消すことはできる（中止はできない）。
   rpc SetTodoStatus(SetTodoStatusRequest) returns (Todo);
   // Todo を削除する。Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で呼んでも同じ）。
   // 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。
@@ -49,7 +53,8 @@ service TodoService {
   rpc ListTodoComments(ListTodoCommentsRequest) returns (ListTodoCommentsResponse);
   // Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。
   // anchor を付けるとドキュメントの選択範囲へのレビューコメント、reply_to を付けるとそのコメントへの返信になる。
-  // status を指定すると、コメントと同時に Todo の状態を変える（GitHub の "Close with comment"）。
+  // status を指定すると、コメントと同時に Todo の状態を変える（GitHub の "Close with comment"）。状態を変えるには書き込み権限が要る
+  // （閲覧のみのメンバーも、その Todo の担当者なら、自分の分の完了・取り消しだけはできる）。
   rpc CreateTodoComment(CreateTodoCommentRequest) returns (TodoComment);
   // コメントの本文を直す。書いた人だけができる。
   rpc UpdateTodoComment(UpdateTodoCommentRequest) returns (TodoComment);
@@ -77,7 +82,8 @@ service TodoService {
   // 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。
   rpc ListTodoChangeHistories(ListTodoChangeHistoriesRequest) returns (ListTodoChangeHistoriesResponse);
   // Todo の完了チケットを発行する。あとで RedeemTodoCompletionTicket で、利用者のトークンなしに Todo を完了報告つきで完了にできる
-  // （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る。
+  // （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る
+  // （閲覧のみのメンバーも、その Todo の担当者なら発行できる。引き換えで完了になるのはその人の分だけ）。
   rpc CreateTodoCompletionTicket(CreateTodoCompletionTicketRequest) returns (TodoCompletionTicket);
 }
 
