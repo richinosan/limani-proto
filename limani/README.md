@@ -50,6 +50,7 @@
   
 - [limani/v1/todo_comment.proto](#limani_v1_todo_comment-proto)
     - [TodoComment](#limani-v1-TodoComment)
+    - [TodoCommentAnchor](#limani-v1-TodoCommentAnchor)
   
 - [limani/v1/todo_comment_api.proto](#limani_v1_todo_comment_api-proto)
     - [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest)
@@ -57,7 +58,9 @@
     - [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest)
     - [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse)
     - [PinTodoCommentRequest](#limani-v1-PinTodoCommentRequest)
+    - [ResolveTodoCommentRequest](#limani-v1-ResolveTodoCommentRequest)
     - [UnpinTodoCommentRequest](#limani-v1-UnpinTodoCommentRequest)
+    - [UnresolveTodoCommentRequest](#limani-v1-UnresolveTodoCommentRequest)
     - [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest)
   
 - [limani/v1/todo_completion_ticket.proto](#limani_v1_todo_completion_ticket-proto)
@@ -784,6 +787,15 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 サーバーは本文（Markdown）を解釈してメンションを見つけることはしない。mentions に入った人は、
 メンションされたことの通知（limani の NOTIFICATION_KIND_MENTIONED）を受け取る。
 
+コメントには、ドキュメントの選択範囲に付ける「レビューコメント」がある（Google ドキュメントや Zenn のレビューのような使い方）。
+ebi（ブログ記事）や pompe（SNS の投稿）が、記事・投稿の一部を選択して書いたコメントを、その作成タスクのコメントとして limani に保存する。
+選択範囲は anchor（TodoCommentAnchor）に入れる。anchor のあるコメントが「レビューのスレッド」のルートになり、
+それへの返信は reply_to でルートを指す（返信に anchor はない。スレッドは 1 段）。
+limani は anchor を保存して返すだけで、ドキュメントの中身を解釈しない（URL を開いて範囲に戻るのはクライアントの仕事）。
+スレッドは、ルートに「解決済み」の印（resolve_time・resolved_by。ResolveTodoComment・UnresolveTodoComment）を付けられる。
+ルートのコメントを削除すると、その返信もすべて消える。
+レビューコメントの作成・返信・解決も、通常のコメントと同じく、Todo の etag・sequence・update_time、カレンダーの sync_token を変えない。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -802,6 +814,49 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 サーバーは保存するときに次のように整える（エラーにせず、黙って落とす）。 - 前後の空白を取り除き、空の要素と重複を落とす。 - Todo が出ているカレンダー（TodoLink）のどれかのメンバーでない ID を落とす （メンバーでない人にはメンションの通知を送らない。存在しない ID・書式の違う文字列も同じ）。 - 書いた人本人は残す（ただし、本人には通知しない）。 空の要素と重複を除いた数が 50 を超えると INVALID_ARGUMENT（メンバーかどうかで落とす前の数。 「mentions は 50 人以内にしてください」。Todo.assignees と同じ上限）。 返す値は整えたあとのもので、指定した値より少ないことがある。順は指定した順ではなく、kebab のユーザー ID の昇順。
 
 作成時（CreateTodoCommentRequest）は、指定したすべての人が（書いた人本人を除いて）メンションの通知を受け取る。 更新時（UpdateTodoCommentRequest）は、update_mask に mentions を含めたときだけ置き換わり（空なら全員外れる）、 通知を受け取るのは、直す前の mentions になかった人だけ（ほかの人には通知しない）。 一度メンションされた人は、その Todo の参加者になり、以降のコメントの通知（NOTIFICATION_KIND_COMMENTED）も受け取る。 メンションは Todo の etag・sequence・update_time、カレンダーの sync_token を変えず、iCalendar・CalDAV にも出ない。 CreateTodoCompletionTicket・RedeemTodoCompletionTicket で書くコメントでは、メンションできない（常に空）。 |
+| anchor | [TodoCommentAnchor](#limani-v1-TodoCommentAnchor) |  | ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。OPTIONAL・IMMUTABLE。 設定したコメントは「レビューコメント」で、レビューのスレッド（reply_to で返信がぶら下がる）のルートになる。 CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。 選択範囲をずらしたいときは、コメントを消して書き直す。 中身は TodoCommentAnchor の検証に通ったものだけが入る（通らなければ INVALID_ARGUMENT）。返すときは検証・正規化したあとの値。 reply_to と同時に指定できない（返信に anchor はない）。CreateTodoCommentRequest.status とも同時に指定できない。 |
+| reply_to | [string](#string) |  | このコメントが返信する、ルートのコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 OPTIONAL・IMMUTABLE。空なら返信ではない（通常のコメントか、anchor のあるルート）。 CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。
+
+指定できるのは、同じ Todo の、anchor のあるルートのコメントだけ。 {calendar} は Todo が出ているカレンダーのどれでもよい（name と同じ）。返す値は、name と同じく、問い合わせたカレンダーのもの。 - 返信先がない（消えた・{todo} のコメントがない）→ NOT_FOUND - 別の Todo のコメント → INVALID_ARGUMENT - anchor のないコメントへの返信、返信への返信（スレッドは 1 段）→ INVALID_ARGUMENT （通常のコメントへの返信は今のところ受け付けない。将来、受け付けるようにするかもしれない） - anchor と同時に指定する → INVALID_ARGUMENT - CreateTodoCommentRequest.status と同時に指定する → INVALID_ARGUMENT 返信にも本文（body）は必須で、mentions も付けられる。返信も 1 つの Todo に付けられるコメントの上限（1000 件）に数える。 解決済みのスレッドに返信すると、スレッドは未解決に戻る（resolve_time・resolved_by が消える。Google ドキュメントと同じ）。 返信にもピン留め（PinTodoComment）はできる（ルートと同じ。ピン留めの扱いは変わらない）。 ルートのコメントが消えると（DeleteTodoComment）、返信も消える。返信だけを消しても、ルートや、ほかの返信は消えない。 |
+| resolve_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | スレッドを解決済みにした時刻。anchor のあるルートのコメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。 ResolveTodoComment で入り、UnresolveTodoComment、または解決済みのスレッドへの返信で消える。 すでに解決済みのスレッドにもう一度 ResolveTodoComment を呼んでも変わらない。 解決・解決の取り消しは、コメントの update_time（本文を直した時刻）を変えない。 |
+| resolved_by | [string](#string) |  | スレッドを解決済みにした人の kebab のユーザー ID（author と同じ形式）。解決済みでなければ空。 解決した人がカレンダーのメンバーから外れても、そのまま返る。 |
+
+
+
+
+
+
+<a name="limani-v1-TodoCommentAnchor"></a>
+
+### TodoCommentAnchor
+TodoCommentAnchor は、レビューコメントが指す、ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。
+
+W3C Web Annotation Data Model の TextQuoteSelector（exact・prefix・suffix）を中心に、
+位置のヒント（start・end）と、ドキュメントを開く URL（uri）、ドキュメントの識別子（target）を持つ。
+limani はこれを不透明な値として保存して返す。検証（下記の長さ・文字・URL の形）以外には、中身を解釈しない
+（ドキュメントが実際にあるか、exact が本当にその位置にあるかも確かめない）。
+
+クライアントは、ドキュメントが編集されて位置がずれたあとでも、exact・prefix・suffix でドキュメントを検索して範囲を探し直す
+（再アンカー）。start・end は探すときの「ヒント」でしかなく、正しいとは限らない。
+行番号は、表示するときにクライアントが位置から求めるもので、保存しない。
+
+文字数はすべて Unicode のコードポイントで数える（start・end だけは UTF-16 のコードユニット）。
+文字列に使えない文字は、改行（LF）とタブを除く制御文字など（TodoComment.body と同じ）。ただし target・part・version・target_title は
+改行とタブも使えない（1 行の識別子・題名として扱う）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| uri | [string](#string) |  | コメントの位置でドキュメントを開く URL（たとえば ebi の編集画面の URL）。必須。 limani の画面は、これをリンクとして見せる。 絶対 URL の https:// で始まるものだけ（開発用に、http://localhost と http://127.0.0.1 は http:// でもよい。ポートを付けてもよい）。 2048 文字以内で、空白・制御文字・ユーザー情報（user:password@）を含められない。違反は INVALID_ARGUMENT。 |
+| target | [string](#string) |  | ドキュメントを識別する、クライアントが決める安定した ID（たとえば //ebi.kanade.party/blogs/123、 //pompe.kanade.party/posts/abc）。必須。 クライアントは、ドキュメントごとにコメントを絞り込むために使う（ListTodoCommentsRequest.anchor_target）。 512 文字以内で、制御文字（改行・タブを含む）は使えない。違反は INVALID_ARGUMENT。 |
+| part | [string](#string) |  | ドキュメントの中の部分（たとえば pompe のスレッドの投稿の ID・番号）。OPTIONAL。 1 つのドキュメントが複数の部分からなるとき、start・end はこの部分の中の位置になる。空なら、ドキュメント全体。 256 文字以内で、制御文字は使えない。 |
+| version | [string](#string) |  | コメントしたときの、ドキュメントの版（たとえば ebi の change_history_id）。OPTIONAL。 start・end は、この版のドキュメントの位置。空なら、版は不明。 256 文字以内で、制御文字は使えない。 |
+| exact | [string](#string) |  | 選択した文字列そのもの（W3C Web Annotation の TextQuoteSelector の exact）。必須。 1 文字以上 2000 文字以内。改行（CRLF・CR）は LF にそろえて保存する。 前後の空白は取り除かない（空白も範囲の一部なので、そのまま保存する）。ただし、空・空白だけは INVALID_ARGUMENT。 制御文字（改行とタブを除く）は使えない。 |
+| prefix | [string](#string) |  | exact の直前の文脈（TextQuoteSelector の prefix）。OPTIONAL。64 文字以内。再アンカーで同じ文字列を見分けるために使う。 改行は LF にそろえ、前後の空白は取り除かない。制御文字（改行とタブを除く）は使えない。 |
+| suffix | [string](#string) |  | exact の直後の文脈（TextQuoteSelector の suffix）。OPTIONAL。64 文字以内。prefix と同じ扱い。 |
+| start | [int32](#int32) |  | 位置のヒント: part（なければドキュメント全体）の中の、選択範囲の開始位置。OPTIONAL。 UTF-16 のコードユニットの数（JavaScript の文字列の添字）で、version のドキュメントで 0 から数える。 0 &lt;= start &lt;= end でなければ INVALID_ARGUMENT。 start と end がどちらも 0 のときは、位置のヒントがない（exact は空にできないので、実際の範囲では end が 0 より大きい）。 あくまでヒントで、ドキュメントが編集されていたら合わない。クライアントは exact・prefix・suffix で探し直すこと。 |
+| end | [int32](#int32) |  | 位置のヒント: 選択範囲の終了位置（含まない）。start と同じ単位。OPTIONAL。 |
+| target_title | [string](#string) |  | ドキュメントの題名（limani の画面で、どのドキュメントへのコメントかを見せるため）。OPTIONAL。 200 文字以内で、制御文字は使えない。コメントしたときの題名の写しで、後から変えても追従しない。 |
 
 
 
@@ -830,7 +885,12 @@ CalDAV クライアントが書いた COMMENT プロパティは ics にその�
 CreateTodoCommentRequest は、Todo にコメントを書く。
 
 呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
-1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED）。
+1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED。返信も 1 件に数える）。
+
+todo_comment.anchor を指定すると、ドキュメントの選択範囲に付けるレビューコメント（レビューのスレッドのルート）になる。
+todo_comment.reply_to を指定すると、そのルートへの返信になる（解決済みのスレッドに返信すると、未解決に戻る）。
+anchor と reply_to は同時に指定できず、どちらも status と同時に指定できない（INVALID_ARGUMENT）。
+書き込み権限は通常のコメントと同じ（メンバーならよい。読み取りだけのメンバーもレビューコメント・返信を書ける）。
 
 status を指定すると、GitHub の &#34;Close with comment&#34; のように、Todo の状態を変えてからコメントを書く。
 状態の変更は SetTodoStatus と同じ（COMPLETED にすると completed_time が入り percent_complete が 100 になる。
@@ -845,7 +905,7 @@ COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を�
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。 |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。mentions（メンションした人の kebab のユーザー ID）は任意。 mentions に入れた人（Todo が出ているカレンダーのメンバーだけ。それ以外は黙って落とす。50 人まで）は、書いた人本人を除いて、 メンションの通知を受け取る（メンションされた人には COMMENTED は送らない）。 name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 作るコメント。status を指定しないときは body が必須。mentions（メンションした人の kebab のユーザー ID）は任意。 mentions に入れた人（Todo が出ているカレンダーのメンバーだけ。それ以外は黙って落とす。50 人まで）は、書いた人本人を除いて、 メンションの通知を受け取る（メンションされた人には COMMENTED は送らない）。 anchor（選択範囲。TodoCommentAnchor の検証に通らなければ INVALID_ARGUMENT）と reply_to（返信先のルートのコメント）は任意。 name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by・ resolve_time・resolved_by は無視する （書いたコメントはピン留めも解決もされていない。ピン留めは PinTodoComment、解決は ResolveTodoComment で行う）。 |
 | status | [TodoStatus](#limani-v1-TodoStatus) |  | コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。 今の状態と同じでもよい（SetTodoStatus と同じく Todo は書き直され、コメントが status_change つきで書かれる）。 |
 
 
@@ -859,6 +919,9 @@ COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を�
 DeleteTodoCommentRequest は、コメントを削除する（物理削除。記録は残さない）。
 
 消せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+
+anchor のあるコメント（レビューのスレッドのルート）を消すと、その返信（reply_to がそのコメントを指すコメント）も
+すべて消える（返信を書いた人でなくても、ルートを書いた人が消せる）。返信だけを消しても、ルートやほかの返信は消えない。
 
 
 | Field | Type | Label | Description |
@@ -878,6 +941,10 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 呼び出し元が parent のカレンダーのメンバーである必要がある。
 書いた人がカレンダーのメンバーから外れていても、コメントは返る。
 
+レビューコメント（anchor のあるコメント）と、その返信（reply_to のあるコメント）も、通常のコメントと一緒に返る（並び順も同じ）。
+クライアントは、reply_to でルートの下に返信をまとめてスレッドを作り、TodoComment.anchor.target で
+ドキュメントごとのコメントを絞る（サーバー側で絞るなら anchor_target）。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -886,6 +953,7 @@ ListTodoCommentsRequest は、Todo のコメントを一覧する。
 | page_token | [string](#string) |  | 前の応答の next_page_token。空なら最初のページ。 |
 | status_change | [TodoStatus](#limani-v1-TodoStatus) |  | 指定すると、TodoComment.status_change がこの値のコメントだけを返す（並び順・ページングは同じ）。 たとえば TODO_STATUS_COMPLETED を指定すると、完了報告だけを取り出せる。 TODO_STATUS_UNSPECIFIED（または省略）なら絞り込まない。 page_token は、同じ status_change で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
 | pinned_only | [bool](#bool) |  | true なら、ピン留めされているコメント（TodoComment.pin_time が設定されているもの）だけを返す（並び順・ページングは同じ）。 false（または省略）なら絞り込まない。status_change と同時に指定すると、両方に合うものだけを返す。 page_token は、同じ status_change・pinned_only の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
+| anchor_target | [string](#string) |  | 指定すると、レビューコメントのうち TodoComment.anchor.target がこの値と等しいルートのコメントと、そのルートへの返信 （TodoComment.reply_to がそのルートを指すコメント）だけを返す。anchor のない通常のコメントは返さない。 並び順・ページングは同じ（作成時刻の昇順で、ルートと返信が混ざる）。 空（または省略）なら絞り込まない。status_change・pinned_only と同時に指定すると、すべてに合うものだけを返す （返信は、返信自身が status_change・pinned_only の条件に合うかで決まる）。 page_token は、同じ status_change・pinned_only・anchor_target の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。 |
 
 
 
@@ -929,6 +997,27 @@ PinTodoCommentRequest は、コメントをピン留めする（Todo の上の�
 
 
 
+<a name="limani-v1-ResolveTodoCommentRequest"></a>
+
+### ResolveTodoCommentRequest
+ResolveTodoCommentRequest は、レビューのスレッドを解決済みにする（Google ドキュメントの「解決」）。
+
+呼び出し元が name のカレンダーのメンバーである必要がある（読み取りだけのメンバーもできる。書いた人でなくてもよい）。
+対象にできるのは、anchor のあるルートのコメントだけ（通常のコメント・返信は FAILED_PRECONDITION）。
+すでに解決済みなら何もせず今の値を返す（resolve_time・resolved_by は最初のまま）。
+解決は、Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time を変えない。通知も送らない。
+解決済みのスレッドに返信を書くと、未解決に戻る。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 |
+
+
+
+
+
+
 <a name="limani-v1-UnpinTodoCommentRequest"></a>
 
 ### UnpinTodoCommentRequest
@@ -938,6 +1027,26 @@ UnpinTodoCommentRequest は、コメントのピン留めを外す。
 ピン留めした人でなくても外せる。ピン留めされていないコメントには何もせず、今の値を返す。
 ピン留めを外しても、コメントは消えない。Todo の etag・sequence・update_time、カレンダーの sync_token、
 コメントの update_time は変わらない。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 |
+
+
+
+
+
+
+<a name="limani-v1-UnresolveTodoCommentRequest"></a>
+
+### UnresolveTodoCommentRequest
+UnresolveTodoCommentRequest は、レビューのスレッドの解決済みを取り消す（未解決に戻す）。
+
+呼び出し元が name のカレンダーのメンバーである必要がある（読み取りだけのメンバーもできる。解決した人でなくてもよい）。
+対象にできるのは、anchor のあるルートのコメントだけ（通常のコメント・返信は FAILED_PRECONDITION）。
+解決済みでなければ何もせず今の値を返す。
+Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time は変わらない。通知も送らない。
 
 
 | Field | Type | Label | Description |
@@ -959,7 +1068,7 @@ UpdateTodoCommentRequest は、コメントの本文を直す。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。 |
+| todo_comment | [TodoComment](#limani-v1-TodoComment) |  | 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。 body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by・anchor・reply_to・resolve_time・resolved_by など）は無視する。 ピン留め・解決済みの印は本文を直しても変わらない。anchor・reply_to は作ったあとに変えられない。 |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。指定できるのは body と mentions。空なら body だけを更新する（mentions は変えない）。 mentions を指定すると、メンションした人をそっくり置き換える（todo_comment.mentions が空なら、全員外す）。 新しくメンションされた人（直す前の mentions になかった人。書いた人本人を除く）だけがメンションの通知を受け取り、 外れた人・そのまま残った人・ほかの人には、通知を送らない。 body を指定しないときは、todo_comment.body は無視する（本文は変わらない）。 |
 
 
@@ -1278,12 +1387,14 @@ TodoService は Todo（VTODO）の API。
 | ListTodoLinks | [ListTodoLinksRequest](#limani-v1-ListTodoLinksRequest) | [ListTodoLinksResponse](#limani-v1-ListTodoLinksResponse) | Todo が出ているカレンダーを一覧する。 |
 | CreateTodoLink | [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest) | [TodoLink](#limani-v1-TodoLink) | Todo をほかのカレンダーにもリンクする（イベント間の同期）。 |
 | DeleteTodoLink | [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。 |
-| ListTodoComments | [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest) | [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse) | Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
-| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。 |
+| ListTodoComments | [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest) | [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse) | Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 レビューコメント（anchor）とその返信（reply_to）も一緒に返る。anchor_target でドキュメントごとに絞れる。 |
+| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 anchor を付けるとドキュメントの選択範囲へのレビューコメント、reply_to を付けるとそのコメントへの返信になる。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。 |
 | UpdateTodoComment | [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントの本文を直す。書いた人だけができる。 |
-| DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。 |
+| DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。レビューコメント（anchor のあるルート）を消すと、その返信も消える。 |
 | PinTodoComment | [PinTodoCommentRequest](#limani-v1-PinTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントをピン留めする。Todo の書き込み権限のあるメンバーなら、誰が書いたコメントでもできる。 すでにピン留めされていれば何もせず今の値を返す。1 つの Todo に 10 件まで。Todo の etag・sequence・update_time は変わらない。 |
 | UnpinTodoComment | [UnpinTodoCommentRequest](#limani-v1-UnpinTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントのピン留めを外す。Todo の書き込み権限のあるメンバーならできる。ピン留めされていなければ何もせず今の値を返す。 |
+| ResolveTodoComment | [ResolveTodoCommentRequest](#limani-v1-ResolveTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | レビューのスレッド（anchor のあるルートのコメント）を解決済みにする。カレンダーのメンバーなら誰でもできる（読み取りだけのロールも）。 すでに解決済みなら何もせず今の値を返す。Todo の etag・sequence・update_time、コメントの update_time は変わらない。 |
+| UnresolveTodoComment | [UnresolveTodoCommentRequest](#limani-v1-UnresolveTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | レビューのスレッドの解決済みを取り消す。カレンダーのメンバーなら誰でもできる。解決済みでなければ何もせず今の値を返す。 |
 | CreateTodoAttachment | [CreateTodoAttachmentRequest](#limani-v1-CreateTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | Todo にファイルを添付する。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。Todo の etag・sequence・update_time は変わらない。 |
 | ListTodoAttachments | [ListTodoAttachmentsRequest](#limani-v1-ListTodoAttachmentsRequest) | [ListTodoAttachmentsResponse](#limani-v1-ListTodoAttachmentsResponse) | Todo の添付を古い順に一覧する（中身は含まず、各添付の download_uri から読む）。添付は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 |
 | GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |

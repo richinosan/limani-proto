@@ -24,6 +24,15 @@ import "limani/v1/todo.proto";
 // 本文に @username と書いたユーザーの kebab のユーザー ID を、書く側（クライアント）が mentions に入れて送る。
 // サーバーは本文（Markdown）を解釈してメンションを見つけることはしない。mentions に入った人は、
 // メンションされたことの通知（limani の NOTIFICATION_KIND_MENTIONED）を受け取る。
+//
+// コメントには、ドキュメントの選択範囲に付ける「レビューコメント」がある（Google ドキュメントや Zenn のレビューのような使い方）。
+// ebi（ブログ記事）や pompe（SNS の投稿）が、記事・投稿の一部を選択して書いたコメントを、その作成タスクのコメントとして limani に保存する。
+// 選択範囲は anchor（TodoCommentAnchor）に入れる。anchor のあるコメントが「レビューのスレッド」のルートになり、
+// それへの返信は reply_to でルートを指す（返信に anchor はない。スレッドは 1 段）。
+// limani は anchor を保存して返すだけで、ドキュメントの中身を解釈しない（URL を開いて範囲に戻るのはクライアントの仕事）。
+// スレッドは、ルートに「解決済み」の印（resolve_time・resolved_by。ResolveTodoComment・UnresolveTodoComment）を付けられる。
+// ルートのコメントを削除すると、その返信もすべて消える。
+// レビューコメントの作成・返信・解決も、通常のコメントと同じく、Todo の etag・sequence・update_time、カレンダーの sync_token を変えない。
 message TodoComment {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
@@ -83,4 +92,92 @@ message TodoComment {
   // メンションは Todo の etag・sequence・update_time、カレンダーの sync_token を変えず、iCalendar・CalDAV にも出ない。
   // CreateTodoCompletionTicket・RedeemTodoCompletionTicket で書くコメントでは、メンションできない（常に空）。
   repeated string mentions = 11 [(google.api.field_behavior) = OPTIONAL];
+  // ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。OPTIONAL・IMMUTABLE。
+  // 設定したコメントは「レビューコメント」で、レビューのスレッド（reply_to で返信がぶら下がる）のルートになる。
+  // CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。
+  // 選択範囲をずらしたいときは、コメントを消して書き直す。
+  // 中身は TodoCommentAnchor の検証に通ったものだけが入る（通らなければ INVALID_ARGUMENT）。返すときは検証・正規化したあとの値。
+  // reply_to と同時に指定できない（返信に anchor はない）。CreateTodoCommentRequest.status とも同時に指定できない。
+  TodoCommentAnchor anchor = 12 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
+  // このコメントが返信する、ルートのコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  // OPTIONAL・IMMUTABLE。空なら返信ではない（通常のコメントか、anchor のあるルート）。
+  // CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。
+  //
+  // 指定できるのは、同じ Todo の、anchor のあるルートのコメントだけ。
+  // {calendar} は Todo が出ているカレンダーのどれでもよい（name と同じ）。返す値は、name と同じく、問い合わせたカレンダーのもの。
+  //   - 返信先がない（消えた・{todo} のコメントがない）→ NOT_FOUND
+  //   - 別の Todo のコメント → INVALID_ARGUMENT
+  //   - anchor のないコメントへの返信、返信への返信（スレッドは 1 段）→ INVALID_ARGUMENT
+  //     （通常のコメントへの返信は今のところ受け付けない。将来、受け付けるようにするかもしれない）
+  //   - anchor と同時に指定する → INVALID_ARGUMENT
+  //   - CreateTodoCommentRequest.status と同時に指定する → INVALID_ARGUMENT
+  // 返信にも本文（body）は必須で、mentions も付けられる。返信も 1 つの Todo に付けられるコメントの上限（1000 件）に数える。
+  // 解決済みのスレッドに返信すると、スレッドは未解決に戻る（resolve_time・resolved_by が消える。Google ドキュメントと同じ）。
+  // 返信にもピン留め（PinTodoComment）はできる（ルートと同じ。ピン留めの扱いは変わらない）。
+  // ルートのコメントが消えると（DeleteTodoComment）、返信も消える。返信だけを消しても、ルートや、ほかの返信は消えない。
+  string reply_to = 13 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
+  // スレッドを解決済みにした時刻。anchor のあるルートのコメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。
+  // ResolveTodoComment で入り、UnresolveTodoComment、または解決済みのスレッドへの返信で消える。
+  // すでに解決済みのスレッドにもう一度 ResolveTodoComment を呼んでも変わらない。
+  // 解決・解決の取り消しは、コメントの update_time（本文を直した時刻）を変えない。
+  google.protobuf.Timestamp resolve_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // スレッドを解決済みにした人の kebab のユーザー ID（author と同じ形式）。解決済みでなければ空。
+  // 解決した人がカレンダーのメンバーから外れても、そのまま返る。
+  string resolved_by = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// TodoCommentAnchor は、レビューコメントが指す、ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。
+//
+// W3C Web Annotation Data Model の TextQuoteSelector（exact・prefix・suffix）を中心に、
+// 位置のヒント（start・end）と、ドキュメントを開く URL（uri）、ドキュメントの識別子（target）を持つ。
+// limani はこれを不透明な値として保存して返す。検証（下記の長さ・文字・URL の形）以外には、中身を解釈しない
+// （ドキュメントが実際にあるか、exact が本当にその位置にあるかも確かめない）。
+//
+// クライアントは、ドキュメントが編集されて位置がずれたあとでも、exact・prefix・suffix でドキュメントを検索して範囲を探し直す
+// （再アンカー）。start・end は探すときの「ヒント」でしかなく、正しいとは限らない。
+// 行番号は、表示するときにクライアントが位置から求めるもので、保存しない。
+//
+// 文字数はすべて Unicode のコードポイントで数える（start・end だけは UTF-16 のコードユニット）。
+// 文字列に使えない文字は、改行（LF）とタブを除く制御文字など（TodoComment.body と同じ）。ただし target・part・version・target_title は
+// 改行とタブも使えない（1 行の識別子・題名として扱う）。
+message TodoCommentAnchor {
+  // コメントの位置でドキュメントを開く URL（たとえば ebi の編集画面の URL）。必須。
+  // limani の画面は、これをリンクとして見せる。
+  // 絶対 URL の https:// で始まるものだけ（開発用に、http://localhost と http://127.0.0.1 は http:// でもよい。ポートを付けてもよい）。
+  // 2048 文字以内で、空白・制御文字・ユーザー情報（user:password@）を含められない。違反は INVALID_ARGUMENT。
+  string uri = 1 [(google.api.field_behavior) = REQUIRED];
+  // ドキュメントを識別する、クライアントが決める安定した ID（たとえば //ebi.kanade.party/blogs/123、
+  // //pompe.kanade.party/posts/abc）。必須。
+  // クライアントは、ドキュメントごとにコメントを絞り込むために使う（ListTodoCommentsRequest.anchor_target）。
+  // 512 文字以内で、制御文字（改行・タブを含む）は使えない。違反は INVALID_ARGUMENT。
+  string target = 2 [(google.api.field_behavior) = REQUIRED];
+  // ドキュメントの中の部分（たとえば pompe のスレッドの投稿の ID・番号）。OPTIONAL。
+  // 1 つのドキュメントが複数の部分からなるとき、start・end はこの部分の中の位置になる。空なら、ドキュメント全体。
+  // 256 文字以内で、制御文字は使えない。
+  string part = 3 [(google.api.field_behavior) = OPTIONAL];
+  // コメントしたときの、ドキュメントの版（たとえば ebi の change_history_id）。OPTIONAL。
+  // start・end は、この版のドキュメントの位置。空なら、版は不明。
+  // 256 文字以内で、制御文字は使えない。
+  string version = 4 [(google.api.field_behavior) = OPTIONAL];
+  // 選択した文字列そのもの（W3C Web Annotation の TextQuoteSelector の exact）。必須。
+  // 1 文字以上 2000 文字以内。改行（CRLF・CR）は LF にそろえて保存する。
+  // 前後の空白は取り除かない（空白も範囲の一部なので、そのまま保存する）。ただし、空・空白だけは INVALID_ARGUMENT。
+  // 制御文字（改行とタブを除く）は使えない。
+  string exact = 5 [(google.api.field_behavior) = REQUIRED];
+  // exact の直前の文脈（TextQuoteSelector の prefix）。OPTIONAL。64 文字以内。再アンカーで同じ文字列を見分けるために使う。
+  // 改行は LF にそろえ、前後の空白は取り除かない。制御文字（改行とタブを除く）は使えない。
+  string prefix = 6 [(google.api.field_behavior) = OPTIONAL];
+  // exact の直後の文脈（TextQuoteSelector の suffix）。OPTIONAL。64 文字以内。prefix と同じ扱い。
+  string suffix = 7 [(google.api.field_behavior) = OPTIONAL];
+  // 位置のヒント: part（なければドキュメント全体）の中の、選択範囲の開始位置。OPTIONAL。
+  // UTF-16 のコードユニットの数（JavaScript の文字列の添字）で、version のドキュメントで 0 から数える。
+  // 0 <= start <= end でなければ INVALID_ARGUMENT。
+  // start と end がどちらも 0 のときは、位置のヒントがない（exact は空にできないので、実際の範囲では end が 0 より大きい）。
+  // あくまでヒントで、ドキュメントが編集されていたら合わない。クライアントは exact・prefix・suffix で探し直すこと。
+  int32 start = 8 [(google.api.field_behavior) = OPTIONAL];
+  // 位置のヒント: 選択範囲の終了位置（含まない）。start と同じ単位。OPTIONAL。
+  int32 end = 9 [(google.api.field_behavior) = OPTIONAL];
+  // ドキュメントの題名（limani の画面で、どのドキュメントへのコメントかを見せるため）。OPTIONAL。
+  // 200 文字以内で、制御文字は使えない。コメントしたときの題名の写しで、後から変えても追従しない。
+  string target_title = 10 [(google.api.field_behavior) = OPTIONAL];
 }
