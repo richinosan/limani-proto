@@ -11,6 +11,10 @@ import "limani/v1/todo_comment.proto";
 //
 // 呼び出し元が parent のカレンダーのメンバーである必要がある。
 // 書いた人がカレンダーのメンバーから外れていても、コメントは返る。
+//
+// レビューコメント（anchor のあるコメント）と、その返信（reply_to のあるコメント）も、通常のコメントと一緒に返る（並び順も同じ）。
+// クライアントは、reply_to でルートの下に返信をまとめてスレッドを作り、TodoComment.anchor.target で
+// ドキュメントごとのコメントを絞る（サーバー側で絞るなら anchor_target）。
 message ListTodoCommentsRequest {
   // 親の Todo（calendars/{calendar}/todos/{todo}）。{calendar} は Todo が出ているカレンダーのどれでもよい。
   string parent = 1 [(google.api.field_behavior) = REQUIRED];
@@ -27,6 +31,13 @@ message ListTodoCommentsRequest {
   // false（または省略）なら絞り込まない。status_change と同時に指定すると、両方に合うものだけを返す。
   // page_token は、同じ status_change・pinned_only の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。
   bool pinned_only = 5 [(google.api.field_behavior) = OPTIONAL];
+  // 指定すると、レビューコメントのうち TodoComment.anchor.target がこの値と等しいルートのコメントと、そのルートへの返信
+  // （TodoComment.reply_to がそのルートを指すコメント）だけを返す。anchor のない通常のコメントは返さない。
+  // 並び順・ページングは同じ（作成時刻の昇順で、ルートと返信が混ざる）。
+  // 空（または省略）なら絞り込まない。status_change・pinned_only と同時に指定すると、すべてに合うものだけを返す
+  // （返信は、返信自身が status_change・pinned_only の条件に合うかで決まる）。
+  // page_token は、同じ status_change・pinned_only・anchor_target の組で取得したときだけ使える（違う値で使うと INVALID_ARGUMENT）。
+  string anchor_target = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListTodoCommentsResponse {
@@ -39,13 +50,20 @@ message ListTodoCommentsResponse {
 // CreateTodoCommentRequest は、Todo にコメントを書く。
 //
 // 呼び出し元が parent のカレンダーのメンバーである必要がある（vitrina のロールが読み取りだけの人もできる）。
-// 1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED）。
+// 1 つの Todo に付けられるコメントは 1000 件まで（超えると RESOURCE_EXHAUSTED。返信も 1 件に数える）。
+//
+// todo_comment.anchor を指定すると、ドキュメントの選択範囲に付けるレビューコメント（レビューのスレッドのルート）になる。
+// todo_comment.reply_to を指定すると、そのルートへの返信になる（解決済みのスレッドに返信すると、未解決に戻る）。
+// anchor と reply_to は同時に指定できず、どちらも status と同時に指定できない（INVALID_ARGUMENT）。
+// 書き込み権限は通常のコメントと同じ（メンバーならよい。読み取りだけのメンバーもレビューコメント・返信を書ける）。
 //
 // status を指定すると、GitHub の "Close with comment" のように、Todo の状態を変えてからコメントを書く。
 // 状態の変更は SetTodoStatus と同じ（COMPLETED にすると completed_time が入り percent_complete が 100 になる。
 // COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
 // カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
 // 読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+// ただし、読み取りだけのメンバーも、その Todo の担当者なら、COMPLETED（自分の分の完了）と、COMPLETED から戻す（自分の分の取り消し）
+// 状態つきのコメントは書ける（中止や、自分の分以外が変わる状態の変更は PERMISSION_DENIED。SetTodoStatus の「閲覧のみのメンバーの自己申告」を参照）。
 // 担当者がいるときの COMPLETED は、コメントを書いた人（行為者）の分の完了になり、全員の分がそろわなければ Todo は
 // COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を参照。コメントの status_change は COMPLETED のまま）。
 // 状態を変えられなかったときは、コメントも書かない。
@@ -55,8 +73,10 @@ message CreateTodoCommentRequest {
   // 作るコメント。status を指定しないときは body が必須。mentions（メンションした人の kebab のユーザー ID）は任意。
   // mentions に入れた人（Todo が出ているカレンダーのメンバーだけ。それ以外は黙って落とす。50 人まで）は、書いた人本人を除いて、
   // メンションの通知を受け取る（メンションされた人には COMMENTED は送らない）。
-  // name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by は無視する
-  // （書いたコメントはピン留めされていない。ピン留めは PinTodoComment で行う）。
+  // anchor（選択範囲。TodoCommentAnchor の検証に通らなければ INVALID_ARGUMENT）と reply_to（返信先のルートのコメント）は任意。
+  // name・author・author_display_name・author_image_url・create_time・update_time・status_change・pin_time・pinned_by・
+  // resolve_time・resolved_by は無視する
+  // （書いたコメントはピン留めも解決もされていない。ピン留めは PinTodoComment、解決は ResolveTodoComment で行う）。
   TodoComment todo_comment = 2 [(google.api.field_behavior) = REQUIRED];
   // コメントと同時に変える Todo の状態。TODO_STATUS_UNSPECIFIED（または省略）なら状態は変えない。
   // 指定したときは body を空にでき（出来事だけの記録になる）、書いたコメントの status_change にこの値が入る。
@@ -69,7 +89,8 @@ message CreateTodoCommentRequest {
 // 直せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
 message UpdateTodoCommentRequest {
   // 直すコメント。name で対象を決める。Todo が出ているカレンダーのどの name でもよい。
-  // body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by など）は無視する。ピン留めは本文を直しても変わらない。
+  // body・mentions 以外（author・create_time・update_time・status_change・pin_time・pinned_by・anchor・reply_to・resolve_time・resolved_by など）は無視する。
+  // ピン留め・解決済みの印は本文を直しても変わらない。anchor・reply_to は作ったあとに変えられない。
   TodoComment todo_comment = 1 [(google.api.field_behavior) = REQUIRED];
   // 更新するフィールド。指定できるのは body と mentions。空なら body だけを更新する（mentions は変えない）。
   // mentions を指定すると、メンションした人をそっくり置き換える（todo_comment.mentions が空なら、全員外す）。
@@ -82,6 +103,9 @@ message UpdateTodoCommentRequest {
 // DeleteTodoCommentRequest は、コメントを削除する（物理削除。記録は残さない）。
 //
 // 消せるのは書いた人だけ（それ以外のメンバーは PERMISSION_DENIED）。
+//
+// anchor のあるコメント（レビューのスレッドのルート）を消すと、その返信（reply_to がそのコメントを指すコメント）も
+// すべて消える（返信を書いた人でなくても、ルートを書いた人が消せる）。返信だけを消しても、ルートやほかの返信は消えない。
 message DeleteTodoCommentRequest {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
@@ -106,6 +130,29 @@ message PinTodoCommentRequest {
 // ピン留めを外しても、コメントは消えない。Todo の etag・sequence・update_time、カレンダーの sync_token、
 // コメントの update_time は変わらない。
 message UnpinTodoCommentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// ResolveTodoCommentRequest は、レビューのスレッドを解決済みにする（Google ドキュメントの「解決」）。
+//
+// 呼び出し元が name のカレンダーのメンバーである必要がある（読み取りだけのメンバーもできる。書いた人でなくてもよい）。
+// 対象にできるのは、anchor のあるルートのコメントだけ（通常のコメント・返信は FAILED_PRECONDITION）。
+// すでに解決済みなら何もせず今の値を返す（resolve_time・resolved_by は最初のまま）。
+// 解決は、Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time を変えない。通知も送らない。
+// 解決済みのスレッドに返信を書くと、未解決に戻る。
+message ResolveTodoCommentRequest {
+  // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// UnresolveTodoCommentRequest は、レビューのスレッドの解決済みを取り消す（未解決に戻す）。
+//
+// 呼び出し元が name のカレンダーのメンバーである必要がある（読み取りだけのメンバーもできる。解決した人でなくてもよい）。
+// 対象にできるのは、anchor のあるルートのコメントだけ（通常のコメント・返信は FAILED_PRECONDITION）。
+// 解決済みでなければ何もせず今の値を返す。
+// Todo の etag・sequence・update_time、カレンダーの sync_token、コメントの update_time は変わらない。通知も送らない。
+message UnresolveTodoCommentRequest {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
