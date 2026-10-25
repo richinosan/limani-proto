@@ -259,7 +259,7 @@ Todo は VTODO 1件。
 | completed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | COMPLETED。status が COMPLETED になると、未指定ならサーバーが現在時刻を入れる。 |
 | categories | [string](#string) | repeated | CATEGORIES。 |
 | parent_uid | [string](#string) |  | 親の Todo の UID（RELATED-TO;RELTYPE=PARENT）。 親は、書き込みに使ったカレンダーの中で UID から探す（Todo が出ているカレンダーごとに、親の Todo が出ているとは限らない。 親がそのカレンダーに出ていなければ、そのカレンダーからは親が見つからない）。 |
-| assignees | [string](#string) | repeated | 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。 返すのは、Todo が出ているすべてのカレンダーのメンバーのうち、いまメンバーである人だけ。 |
+| assignees | [string](#string) | repeated | 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。 返すのは、Todo が出ているすべてのカレンダーのメンバーのうち、いまメンバーである人だけ。 書き込み権限のない（閲覧のみの）メンバーも、UpdateTodo の update_mask に assignees だけを指定して、自分自身を担当者に足す・外すことはできる （ほかの人を足したり外したりすると PERMISSION_DENIED。UpdateTodoRequest の「閲覧のみのメンバーの自己申告」を参照）。 |
 | sequence | [int32](#int32) |  | SEQUENCE。更新のたびに増える。 |
 | etag | [string](#string) |  | 楽観的排他制御のための値。CalDAV の ETag と同じ。 UpdateTodo で指定すると、保存されている値と違うときに ABORTED を返す。 |
 | ics | [string](#string) |  | VCALENDAR 全文（RFC 5545）。 |
@@ -268,7 +268,7 @@ Todo は VTODO 1件。
 | calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
 | creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
 | last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 |
-| completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。 |
+| completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。 |
 
 
 
@@ -433,6 +433,11 @@ UpdateTodo の status、状態つきの CreateTodoComment、RedeemTodoCompletion
 
 担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
 
+閲覧のみのメンバーの自己申告: Todo の書き込み権限が要るが、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
+自分の分だけを完了にする（COMPLETED）・取り消す（COMPLETED から戻す。自分の分が完了しているとき）ことができる。
+自分の分が最後なら Todo は COMPLETED になる。担当者でない、中止（CANCELLED）にする、自分の分の完了と関係なく Todo の状態だけを変える、
+ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。状態つきの CreateTodoComment も同じ規則になる。
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -459,9 +464,11 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 | todo | [Todo](#limani-v1-Todo) |  | 更新する Todo。name で対象を決める。Todo が出ているカレンダーのどの name でもよく、 どのカレンダーから更新しても、Todo が出ているすべてのカレンダーに反映される。 |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。次のどれか: summary, description, status, priority, percent_complete, dtstart, due, completed_time, categories, parent_uid, assignees, completed_assignees。
 
-completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、 COMPLETED だった Todo は IN_PROCESS に戻り（completed_time を消す）、NEEDS_ACTION だった Todo は IN_PROCESS になる。 status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
+completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける （書き込み権限のない閲覧のみのメンバーは、自分が担当者のとき、自分の分だけ。下の「閲覧のみのメンバーの自己申告」） （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、 COMPLETED だった Todo は IN_PROCESS に戻り（completed_time を消す）、NEEDS_ACTION だった Todo は IN_PROCESS になる。 status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
 
-status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。 |
+status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。
+
+閲覧のみのメンバーの自己申告: 書き込み権限のない（閲覧のみの）メンバーが更新できるのは、次の 2 つだけ。 それ以外のフィールドを update_mask に含める、または ほかの人の担当者・ほかの人の分の完了を変えると PERMISSION_DENIED （書き込み権限のあるメンバーは、これまでどおり全部できる）。 - assignees: 自分自身を担当者に足す、または外す（今の担当者との差が自分だけ）。足すときの ATTENDEE の扱いは、書き込み権限のある人が足すときと同じ。 外すと、自分の分の完了も消える。外した結果、残る担当者の全員の分が完了していれば、Todo は COMPLETED になる（導かれる結果）。 - completed_assignees: 自分が担当者のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。 自分の分が最後なら Todo は COMPLETED になる（導かれる結果）。 同じリクエストに assignees と completed_assignees の両方を指定してもよい（どちらも自分の分だけに限られる）。 |
 
 
 
@@ -897,6 +904,8 @@ status を指定すると、GitHub の &#34;Close with comment&#34; のように
 COMPLETED から別の状態に戻すと completed_time が消える）ので、Todo の etag・sequence・update_time と
 カレンダーの sync_token が変わる（etag の確認はしない）。状態を変えるには Todo の書き込み権限が要り、
 読み取りだけのメンバーは PERMISSION_DENIED になって、状態もコメントも書かれない。
+ただし、読み取りだけのメンバーも、その Todo の担当者なら、COMPLETED（自分の分の完了）と、COMPLETED から戻す（自分の分の取り消し）
+状態つきのコメントは書ける（中止や、自分の分以外が変わる状態の変更は PERMISSION_DENIED。SetTodoStatus の「閲覧のみのメンバーの自己申告」を参照）。
 担当者がいるときの COMPLETED は、コメントを書いた人（行為者）の分の完了になり、全員の分がそろわなければ Todo は
 COMPLETED にならない（SetTodoStatus の「担当者ごとの完了」を参照。コメントの status_change は COMPLETED のまま）。
 状態を変えられなかったときは、コメントも書かない。
@@ -1143,6 +1152,9 @@ CreateTodoCompletionTicketRequest は、Todo の完了チケットを発行す�
 
 認証は kebab のアクセストークン。呼び出し元が Todo の書き込み権限を持つ必要がある
 （読み取りだけのメンバーは PERMISSION_DENIED、メンバーでなければ NOT_FOUND）。
+ただし、読み取りだけのメンバーも、その Todo の担当者なら発行できる（レビューする人が自分の分を承認するため）。
+そのチケットを引き換えると、完了になるのは発行した人の分だけ（SetTodoStatus の「閲覧のみのメンバーの自己申告」と同じ。
+全員の分がそろうまで Todo は COMPLETED にならない）。
 発行しても Todo は変わらない（etag・sequence・update_time、カレンダーの sync_token も変わらない）。
 1 つの Todo に対して、引き換えていない有効なチケットは 1000 枚まで（超えると RESOURCE_EXHAUSTED）。
 
@@ -1175,7 +1187,8 @@ CreateTodoCommentRequest に status = TODO_STATUS_COMPLETED を付けて書い�
    （応答を受け取れなかったときに再試行してよい）。その完了報告が削除されていれば FAILED_PRECONDITION。
 3. 発行した人が、Todo が「今」出ているカレンダー（TodoLink）のどれかで、Todo の書き込み権限を持っていること
    （カレンダーのメンバーの写しで判定する）。発行したカレンダーとのリンクが外れていて、ほかのカレンダーでも
-   書き込み権限がなければ PERMISSION_DENIED で、何も書かない。
+   書き込み権限がなくても、そのカレンダーのメンバーのままで Todo の担当者なら、発行した人の分だけを完了にする。
+   どちらでもなければ PERMISSION_DENIED で、何も書かない。
 4. Todo のコメントが上限（1000 件）に達していれば RESOURCE_EXHAUSTED で、何も書かない
    （チケットは引き換えていない扱いのまま残り、コメントが消されて枠が空けば、期限内なら引き換えられる）。
 
@@ -1381,14 +1394,14 @@ TodoService は Todo（VTODO）の API。
 | ListTodos | [ListTodosRequest](#limani-v1-ListTodosRequest) | [ListTodosResponse](#limani-v1-ListTodosResponse) | カレンダーに出ている Todo を一覧する（TodoLink で同期されている Todo を含む）。 |
 | GetTodo | [GetTodoRequest](#limani-v1-GetTodoRequest) | [Todo](#limani-v1-Todo) |  |
 | CreateTodo | [CreateTodoRequest](#limani-v1-CreateTodoRequest) | [Todo](#limani-v1-Todo) |  |
-| UpdateTodo | [UpdateTodoRequest](#limani-v1-UpdateTodoRequest) | [Todo](#limani-v1-Todo) |  |
-| SetTodoStatus | [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest) | [Todo](#limani-v1-Todo) |  |
+| UpdateTodo | [UpdateTodoRequest](#limani-v1-UpdateTodoRequest) | [Todo](#limani-v1-Todo) | Todo を更新する。Todo の書き込み権限が要る。ただし、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、 update_mask が assignees・completed_assignees だけで、自分を担当者に足す・外す、自分の分の完了・取り消しだけを変えるときはできる。 |
+| SetTodoStatus | [SetTodoStatusRequest](#limani-v1-SetTodoStatusRequest) | [Todo](#limani-v1-Todo) | Todo の状態だけを変える。Todo の書き込み権限が要る。ただし、閲覧のみのメンバーも、その Todo の担当者なら、COMPLETED にして 自分の分だけを完了にする・COMPLETED から戻して自分の分だけを取り消すことはできる（中止はできない）。 |
 | DeleteTodo | [DeleteTodoRequest](#limani-v1-DeleteTodoRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo を削除する。Todo が出ているすべてのカレンダーから消える（どのカレンダーのリソース名で呼んでも同じ）。 1 つのカレンダーから外すだけのときは DeleteTodoLink を使う。 |
 | ListTodoLinks | [ListTodoLinksRequest](#limani-v1-ListTodoLinksRequest) | [ListTodoLinksResponse](#limani-v1-ListTodoLinksResponse) | Todo が出ているカレンダーを一覧する。 |
 | CreateTodoLink | [CreateTodoLinkRequest](#limani-v1-CreateTodoLinkRequest) | [TodoLink](#limani-v1-TodoLink) | Todo をほかのカレンダーにもリンクする（イベント間の同期）。 |
 | DeleteTodoLink | [DeleteTodoLinkRequest](#limani-v1-DeleteTodoLinkRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Todo をカレンダーから外す（そのカレンダーとの同期をやめる）。最後の 1 つのカレンダーからは外せない。 |
 | ListTodoComments | [ListTodoCommentsRequest](#limani-v1-ListTodoCommentsRequest) | [ListTodoCommentsResponse](#limani-v1-ListTodoCommentsResponse) | Todo のコメントを古い順に一覧する。コメントは Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。 レビューコメント（anchor）とその返信（reply_to）も一緒に返る。anchor_target でドキュメントごとに絞れる。 |
-| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 anchor を付けるとドキュメントの選択範囲へのレビューコメント、reply_to を付けるとそのコメントへの返信になる。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。 |
+| CreateTodoComment | [CreateTodoCommentRequest](#limani-v1-CreateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | Todo にコメントを書く。Todo の etag・sequence・update_time は変わらない。 anchor を付けるとドキュメントの選択範囲へのレビューコメント、reply_to を付けるとそのコメントへの返信になる。 status を指定すると、コメントと同時に Todo の状態を変える（GitHub の &#34;Close with comment&#34;）。状態を変えるには書き込み権限が要る （閲覧のみのメンバーも、その Todo の担当者なら、自分の分の完了・取り消しだけはできる）。 |
 | UpdateTodoComment | [UpdateTodoCommentRequest](#limani-v1-UpdateTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントの本文を直す。書いた人だけができる。 |
 | DeleteTodoComment | [DeleteTodoCommentRequest](#limani-v1-DeleteTodoCommentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | コメントを削除する。書いた人だけができる。レビューコメント（anchor のあるルート）を消すと、その返信も消える。 |
 | PinTodoComment | [PinTodoCommentRequest](#limani-v1-PinTodoCommentRequest) | [TodoComment](#limani-v1-TodoComment) | コメントをピン留めする。Todo の書き込み権限のあるメンバーなら、誰が書いたコメントでもできる。 すでにピン留めされていれば何もせず今の値を返す。1 つの Todo に 10 件まで。Todo の etag・sequence・update_time は変わらない。 |
@@ -1400,7 +1413,7 @@ TodoService は Todo（VTODO）の API。
 | GetTodoAttachment | [GetTodoAttachmentRequest](#limani-v1-GetTodoAttachmentRequest) | [TodoAttachment](#limani-v1-TodoAttachment) | 添付を取得する（中身は download_uri から読む）。name の {calendar} に &#34;-&#34; を指定できる。 |
 | DeleteTodoAttachment | [DeleteTodoAttachmentRequest](#limani-v1-DeleteTodoAttachmentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | 添付を削除する。アップロードした人だけができる。 |
 | ListTodoChangeHistories | [ListTodoChangeHistoriesRequest](#limani-v1-ListTodoChangeHistoriesRequest) | [ListTodoChangeHistoriesResponse](#limani-v1-ListTodoChangeHistoriesResponse) | Todo の変更履歴を新しい順に一覧する。変更のたびに、変更後の Todo（snapshot）・変えた人・経路（API か CalDAV か）を残す。 履歴は Todo が出ているすべてのカレンダーで共有され、iCalendar・CalDAV には出ない。呼び出し元がカレンダーのメンバーならできる（読み取りだけのロールも）。 |
-| CreateTodoCompletionTicket | [CreateTodoCompletionTicketRequest](#limani-v1-CreateTodoCompletionTicketRequest) | [TodoCompletionTicket](#limani-v1-TodoCompletionTicket) | Todo の完了チケットを発行する。あとで RedeemTodoCompletionTicket で、利用者のトークンなしに Todo を完了報告つきで完了にできる （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る。 |
+| CreateTodoCompletionTicket | [CreateTodoCompletionTicketRequest](#limani-v1-CreateTodoCompletionTicketRequest) | [TodoCompletionTicket](#limani-v1-TodoCompletionTicket) | Todo の完了チケットを発行する。あとで RedeemTodoCompletionTicket で、利用者のトークンなしに Todo を完了報告つきで完了にできる （pompe の予約投稿が投稿できたら完了にする、など）。Todo の書き込み権限が要る （閲覧のみのメンバーも、その Todo の担当者なら発行できる。引き換えで完了になるのはその人の分だけ）。 |
 
  
 
