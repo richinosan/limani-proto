@@ -64,6 +64,8 @@ message Todo {
   string parent_uid = 12;
   // 担当者の kebab のユーザー ID（ATTENDEE として ics に出る）。
   // 返すのは、Todo が出ているすべてのカレンダーのメンバーのうち、いまメンバーである人だけ。
+  // 書き込み権限のない（閲覧のみの）メンバーも、UpdateTodo の update_mask に assignees だけを指定して、自分自身を担当者に足す・外すことはできる
+  // （ほかの人を足したり外したりすると PERMISSION_DENIED。UpdateTodoRequest の「閲覧のみのメンバーの自己申告」を参照）。
   repeated string assignees = 13;
   // SEQUENCE。更新のたびに増える。
   int32 sequence = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -96,5 +98,6 @@ message Todo {
   // （COMPLETED の Todo では assignees の全員が入る）。
   // assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。
   // UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。
+  // 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。
   repeated string completed_assignees = 22;
 }

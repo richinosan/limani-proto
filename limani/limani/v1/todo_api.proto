@@ -52,6 +52,7 @@ message UpdateTodoRequest {
   // dtstart, due, completed_time, categories, parent_uid, assignees, completed_assignees。
   //
   // completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける
+  // （書き込み権限のない閲覧のみのメンバーは、自分が担当者のとき、自分の分だけ。下の「閲覧のみのメンバーの自己申告」）
   // （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。
   // 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる
   // （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、
@@ -59,6 +60,15 @@ message UpdateTodoRequest {
   // status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
   //
   // status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。
+  //
+  // 閲覧のみのメンバーの自己申告: 書き込み権限のない（閲覧のみの）メンバーが更新できるのは、次の 2 つだけ。
+  // それ以外のフィールドを update_mask に含める、または ほかの人の担当者・ほかの人の分の完了を変えると PERMISSION_DENIED
+  // （書き込み権限のあるメンバーは、これまでどおり全部できる）。
+  //   - assignees: 自分自身を担当者に足す、または外す（今の担当者との差が自分だけ）。足すときの ATTENDEE の扱いは、書き込み権限のある人が足すときと同じ。
+  //     外すと、自分の分の完了も消える。外した結果、残る担当者の全員の分が完了していれば、Todo は COMPLETED になる（導かれる結果）。
+  //   - completed_assignees: 自分が担当者のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。
+  //     自分の分が最後なら Todo は COMPLETED になる（導かれる結果）。
+  // 同じリクエストに assignees と completed_assignees の両方を指定してもよい（どちらも自分の分だけに限られる）。
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
@@ -81,6 +91,11 @@ message UpdateTodoRequest {
 //    - 行為者が担当者でない: 全員の分を未完了に戻す。
 //
 // 担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
+//
+// 閲覧のみのメンバーの自己申告: Todo の書き込み権限が要るが、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
+// 自分の分だけを完了にする（COMPLETED）・取り消す（COMPLETED から戻す。自分の分が完了しているとき）ことができる。
+// 自分の分が最後なら Todo は COMPLETED になる。担当者でない、中止（CANCELLED）にする、自分の分の完了と関係なく Todo の状態だけを変える、
+// ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。状態つきの CreateTodoComment も同じ規則になる。
 message SetTodoStatusRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
