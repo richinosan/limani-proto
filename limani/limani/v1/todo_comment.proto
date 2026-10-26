@@ -32,6 +32,9 @@ import "limani/v1/todo.proto";
 // limani は anchor を保存して返すだけで、ドキュメントの中身を解釈しない（URL を開いて範囲に戻るのはクライアントの仕事）。
 // スレッドは、ルートに「解決済み」の印（resolve_time・resolved_by。ResolveTodoComment・UnresolveTodoComment）を付けられる。
 // ルートのコメントを削除すると、その返信もすべて消える。
+// 選択範囲を持たない、文書全体へのレビューコメントもある（GitHub の PR の「レビューとしてコメント」と同じ使い方）。
+// review を true にしたコメントは、anchor のあるコメントと同じく「レビューのスレッド」のルートになり、返信（reply_to）・解決・
+// ルート削除での返信の削除ができる。review のないコメントは、これまでどおり通常のコメントで、返信も解決もない。
 // レビューコメントの作成・返信・解決も、通常のコメントと同じく、Todo の etag・sequence・update_time、カレンダーの sync_token を変えない。
 message TodoComment {
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
@@ -100,23 +103,23 @@ message TodoComment {
   // reply_to と同時に指定できない（返信に anchor はない）。CreateTodoCommentRequest.status とも同時に指定できない。
   TodoCommentAnchor anchor = 12 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
   // このコメントが返信する、ルートのコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。
-  // OPTIONAL・IMMUTABLE。空なら返信ではない（通常のコメントか、anchor のあるルート）。
+  // OPTIONAL・IMMUTABLE。空なら返信ではない（通常のコメントか、レビューのスレッドのルート）。
   // CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。
   //
-  // 指定できるのは、同じ Todo の、anchor のあるルートのコメントだけ。
+  // 指定できるのは、同じ Todo の、レビューのスレッドのルート（anchor のある、または review が true の）コメントだけ。
   // {calendar} は Todo が出ているカレンダーのどれでもよい（name と同じ）。返す値は、name と同じく、問い合わせたカレンダーのもの。
   //   - 返信先がない（消えた・{todo} のコメントがない）→ NOT_FOUND
   //   - 別の Todo のコメント → INVALID_ARGUMENT
-  //   - anchor のないコメントへの返信、返信への返信（スレッドは 1 段）→ INVALID_ARGUMENT
+  //   - レビューのスレッドのルートでない（anchor がなく review も false の）コメントへの返信、返信への返信（スレッドは 1 段）→ INVALID_ARGUMENT
   //     （通常のコメントへの返信は今のところ受け付けない。将来、受け付けるようにするかもしれない）
-  //   - anchor と同時に指定する → INVALID_ARGUMENT
+  //   - anchor・review と同時に指定する → INVALID_ARGUMENT（返信に anchor・review は付けない）
   //   - CreateTodoCommentRequest.status と同時に指定する → INVALID_ARGUMENT
   // 返信にも本文（body）は必須で、mentions も付けられる。返信も 1 つの Todo に付けられるコメントの上限（1000 件）に数える。
   // 解決済みのスレッドに返信すると、スレッドは未解決に戻る（resolve_time・resolved_by が消える。Google ドキュメントと同じ）。
   // 返信にもピン留め（PinTodoComment）はできる（ルートと同じ。ピン留めの扱いは変わらない）。
   // ルートのコメントが消えると（DeleteTodoComment）、返信も消える。返信だけを消しても、ルートや、ほかの返信は消えない。
   string reply_to = 13 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
-  // スレッドを解決済みにした時刻。anchor のあるルートのコメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。
+  // スレッドを解決済みにした時刻。レビューのスレッドのルート（anchor のある、または review が true の）コメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。
   // ResolveTodoComment で入り、UnresolveTodoComment、または解決済みのスレッドへの返信で消える。
   // すでに解決済みのスレッドにもう一度 ResolveTodoComment を呼んでも変わらない。
   // 解決・解決の取り消しは、コメントの update_time（本文を直した時刻）を変えない。
@@ -124,6 +127,16 @@ message TodoComment {
   // スレッドを解決済みにした人の kebab のユーザー ID（author と同じ形式）。解決済みでなければ空。
   // 解決した人がカレンダーのメンバーから外れても、そのまま返る。
   string resolved_by = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 文書全体へのレビューコメント（選択範囲を持たないレビューコメント）なら true。OPTIONAL・IMMUTABLE。
+  // true のコメントは、anchor のあるコメントと同じく「レビューのスレッド」のルートになる
+  // （reply_to で返信がぶら下がり、ResolveTodoComment・UnresolveTodoComment で解決でき、消すと返信も消える）。
+  // 返信（reply_to のあるコメント）に review は付けない（返信は reply_to だけ）。
+  // CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。
+  // anchor・reply_to と同時に指定できない。CreateTodoCommentRequest.status とも同時に指定できない（INVALID_ARGUMENT）。
+  // false（または省略）なら、review のコメントではない（通常のコメントか、anchor のあるルート、または返信）。
+  // 書き込み権限・通知・Todo の etag・sequence・update_time、カレンダーの sync_token は、anchor のあるレビューコメントと同じ。
+  // ListTodoCommentsRequest.anchor_target で絞り込んだときには、review のコメントは返らない。
+  bool review = 16 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
 }
 
 // TodoCommentAnchor は、レビューコメントが指す、ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。
