@@ -30,6 +30,17 @@ message TodoDateTime {
   string tzid = 3;
 }
 
+// TodoApp は、Todo を作った・更新した外部アプリ（外部アプリ連携。kebab のユーザーではない）。
+// 外部アプリ連携の Webhook（calendars/{calendar}/federatedWebhooks/{federated_webhook}）に届いた JSON から作った Todo の、作った人・更新した人として返す。
+// 連携を削除しても、その連携が作った Todo には名前が残る（display_name は削除の時点のもの）。
+message TodoApp {
+  // 連携のリソース名（calendars/{calendar}/federatedWebhooks/{federated_webhook}）。
+  // {calendar} は連携を登録したカレンダーで、問い合わせたカレンダーとは限らない（Todo が複数のカレンダーに出ているとき）。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // アプリの名前（連携を登録したときの表示名）。
+  string display_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
 // Todo は VTODO 1件。
 message Todo {
   // リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。
@@ -84,12 +95,14 @@ message Todo {
   // 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。
   // CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。
   // 表示名・アイコンは返さない。kebab の GetUser で引くこと。
+  // 外部アプリ連携で作った Todo は空で、代わりに creator_app を返す。
   string creator = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。
   // UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・
   // percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する
   // （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。
   // TodoChangeHistory の actor と対応する。
+  // 外部アプリ連携が最後に更新した（作ったまま更新されていない）ときは空で、代わりに last_updater_app を返す。
   string last_updater = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。
   // 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで
@@ -100,4 +113,9 @@ message Todo {
   // UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。
   // 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。
   repeated string completed_assignees = 22;
+  // 作ったのが外部アプリ連携のときの、そのアプリ。このとき creator は空。kebab のユーザーが作ったときは未設定。
+  TodoApp creator_app = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 最後に更新したのが外部アプリ連携のとき（一度も更新されていなければ作ったアプリ）の、そのアプリ。このとき last_updater は空。
+  // kebab のユーザーが最後に更新したときは未設定。
+  TodoApp last_updater_app = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
