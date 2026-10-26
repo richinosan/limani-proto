@@ -15,6 +15,7 @@
   
 - [limani/v1/todo.proto](#limani_v1_todo-proto)
     - [Todo](#limani-v1-Todo)
+    - [TodoApp](#limani-v1-TodoApp)
     - [TodoDateTime](#limani-v1-TodoDateTime)
   
     - [TodoStatus](#limani-v1-TodoStatus)
@@ -266,9 +267,29 @@ Todo は VTODO 1件。
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 作成時刻。 |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | LAST-MODIFIED。 |
 | calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
-| creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
-| last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 |
+| creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 外部アプリ連携で作った Todo は空で、代わりに creator_app を返す。 |
+| last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 外部アプリ連携が最後に更新した（作ったまま更新されていない）ときは空で、代わりに last_updater_app を返す。 |
 | completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。 |
+| creator_app | [TodoApp](#limani-v1-TodoApp) |  | 作ったのが外部アプリ連携のときの、そのアプリ。このとき creator は空。kebab のユーザーが作ったときは未設定。 |
+| last_updater_app | [TodoApp](#limani-v1-TodoApp) |  | 最後に更新したのが外部アプリ連携のとき（一度も更新されていなければ作ったアプリ）の、そのアプリ。このとき last_updater は空。 kebab のユーザーが最後に更新したときは未設定。 |
+
+
+
+
+
+
+<a name="limani-v1-TodoApp"></a>
+
+### TodoApp
+TodoApp は、Todo を作った・更新した外部アプリ（外部アプリ連携。kebab のユーザーではない）。
+外部アプリ連携の Webhook（calendars/{calendar}/federatedWebhooks/{federated_webhook}）に届いた JSON から作った Todo の、作った人・更新した人として返す。
+連携を削除しても、その連携が作った Todo には名前が残る（display_name は削除の時点のもの）。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | 連携のリソース名（calendars/{calendar}/federatedWebhooks/{federated_webhook}）。 {calendar} は連携を登録したカレンダーで、問い合わせたカレンダーとは限らない（Todo が複数のカレンダーに出ているとき）。 |
+| display_name | [string](#string) |  | アプリの名前（連携を登録したときの表示名）。 |
 
 
 
@@ -666,12 +687,13 @@ PUT し直しても、履歴は増えない）。
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/changeHistories/{change_history}）。{change_history} はサーバーが決める ID。 {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。 返す name は、問い合わせたカレンダーのもの（同じ履歴でも、カレンダーごとに name が違う）。 |
-| actor | [string](#string) |  | 変えた人の kebab のユーザー ID（TodoComment.author と同じ形式）。CalDAV からのときは、アプリパスワードの持ち主。 変えた人がカレンダーのメンバーから外れても返る。表示名・アイコンは返さない。kebab の GetUser で引くこと。 |
+| actor | [string](#string) |  | 変えた人の kebab のユーザー ID（TodoComment.author と同じ形式）。CalDAV からのときは、アプリパスワードの持ち主。 変えた人がカレンダーのメンバーから外れても返る。表示名・アイコンは返さない。kebab の GetUser で引くこと。 外部アプリ連携（source が WEBHOOK）のときは空で、代わりに actor_app を返す。 |
 | change_type | [TodoChangeType](#limani-v1-TodoChangeType) |  | 変更の種類。 |
 | source | [TodoChangeSource](#limani-v1-TodoChangeSource) |  | 変えた経路。 |
-| snapshot | [Todo](#limani-v1-Todo) |  | 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。 sequence・create_time・update_time・creator・last_updater は、変更した時点の値。 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。 |
+| snapshot | [Todo](#limani-v1-Todo) |  | 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。 sequence・create_time・update_time・creator・last_updater（creator_app・last_updater_app）は、変更した時点の値。 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | 変更した時刻。 |
 | comment | [string](#string) |  | この変更と同時に書かれたコメントのリソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。 CreateTodoCommentRequest.status で状態を変えたときだけ入る（GitHub の &#34;Close with comment&#34; の、状態の変更の側）。 画面は、このコメントが一覧にあれば、状態の変更を履歴の側では出さない（コメントが同じ出来事を示すため）。 コメントを削除しても、この値は残る（指すコメントはもうない）。コメントと同時でない変更は空。 {calendar} は、問い合わせたカレンダーのもの。 |
+| actor_app | [TodoApp](#limani-v1-TodoApp) |  | 変えたのが外部アプリ連携のときの、そのアプリ（actor が空のとき）。kebab のユーザーが変えたときは未設定。 |
 
 
 
@@ -690,6 +712,7 @@ TodoChangeSource は、Todo を変えた経路。
 | TODO_CHANGE_SOURCE_UNSPECIFIED | 0 |  |
 | TODO_CHANGE_SOURCE_API | 1 | Connect の API（limani の画面を含む）。 |
 | TODO_CHANGE_SOURCE_CALDAV | 2 | CalDAV（iOS のリマインダー・Thunderbird・Tasks.org など）。 |
+| TODO_CHANGE_SOURCE_WEBHOOK | 3 | 外部アプリ連携（Webhook）。外部アプリが JSON を POST して Todo を作った。このときの変えた人は actor_app。 |
 
 
 
