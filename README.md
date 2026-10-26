@@ -14,7 +14,7 @@ limani は、イベント単位・準備会単位のタスク管理サービス�
 limani.v1
 ```
 
-`limani.v1` には `CalendarService`（カレンダーの参照・作成）と `TodoService`（Todo の参照・作成・更新・状態変更・削除と、Todo をほかのカレンダーにも出すリンク（イベント間の同期）の参照・作成・削除と、Todo へのコメント（`TodoComment`。iCalendar・CalDAV には含まれない）の参照・作成・更新・削除・ピン留め（`PinTodoComment`・`UnpinTodoComment`。書き込み権限のあるメンバーが 1 つの Todo に 10 件まで留められる）と、ドキュメントの選択範囲へのレビューコメント（`TodoComment.anchor`。文書全体へのレビューコメントは `TodoComment.review`・返信 `reply_to`・スレッドの解決 `ResolveTodoComment`・`UnresolveTodoComment`）と、Todo の変更履歴（`TodoChangeHistory`。作った人・最後に更新した人と、変更のたびの変更後の状態。CalDAV からの更新も記録する）の参照と、完了チケット（`TodoCompletionTicket`）の発行）と `TodoCompletionTicketService`（完了チケットを引き換えて、Todo を完了報告つきで完了にする）を含めます。
+`limani.v1` には `CalendarService`（カレンダーの参照・作成）と `TodoService`（Todo の参照・作成・更新・状態変更・削除と、Todo をほかのカレンダーにも出すリンク（イベント間の同期）の参照・作成・削除と、Todo へのコメント（`TodoComment`。iCalendar・CalDAV には含まれない）の参照・作成・更新・削除・ピン留め（`PinTodoComment`・`UnpinTodoComment`。書き込み権限のあるメンバーが 1 つの Todo に 10 件まで留められる）と、ドキュメントの選択範囲へのレビューコメント（`TodoComment.anchor`。文書全体へのレビューコメントは `TodoComment.review`・返信 `reply_to`・スレッドの解決 `ResolveTodoComment`・`UnresolveTodoComment`）と、Todo の変更履歴（`TodoChangeHistory`。作った人・最後に更新した人と、変更のたびの変更後の状態。CalDAV・外部アプリ連携からの変更も記録する。外部アプリ連携（Webhook）で作った Todo の作った人・更新した人は kebab のユーザーではなく `TodoApp`（`Todo.creator_app`・`Todo.last_updater_app`・`TodoChangeHistory.actor_app`）で返し、このとき `creator`・`last_updater`・`actor` は空）の参照と、完了チケット（`TodoCompletionTicket`）の発行）と `TodoCompletionTicketService`（完了チケットを引き換えて、Todo を完了報告つきで完了にする）を含めます。
 アプリパスワードなど画面専用の API は、limani の private proto にあり、ここには含めません。
 
 ## Layout
