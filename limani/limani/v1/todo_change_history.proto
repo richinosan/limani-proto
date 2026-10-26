@@ -22,6 +22,8 @@ enum TodoChangeSource {
   TODO_CHANGE_SOURCE_API = 1;
   // CalDAV（iOS のリマインダー・Thunderbird・Tasks.org など）。
   TODO_CHANGE_SOURCE_CALDAV = 2;
+  // 外部アプリ連携（Webhook）。外部アプリが JSON を POST して Todo を作った。このときの変えた人は actor_app。
+  TODO_CHANGE_SOURCE_WEBHOOK = 3;
 }
 
 // TodoChangeHistory は、Todo の変更履歴の 1 件（変更のたびに、変更後の状態を丸ごと残す）。
@@ -42,13 +44,14 @@ message TodoChangeHistory {
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 変えた人の kebab のユーザー ID（TodoComment.author と同じ形式）。CalDAV からのときは、アプリパスワードの持ち主。
   // 変えた人がカレンダーのメンバーから外れても返る。表示名・アイコンは返さない。kebab の GetUser で引くこと。
+  // 外部アプリ連携（source が WEBHOOK）のときは空で、代わりに actor_app を返す。
   string actor = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 変更の種類。
   TodoChangeType change_type = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 変えた経路。
   TodoChangeSource source = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 変更後の Todo。容量を抑えるため、ics・etag・calendars は空。name は問い合わせたカレンダーのもの。
-  // sequence・create_time・update_time・creator・last_updater は、変更した時点の値。
+  // sequence・create_time・update_time・creator・last_updater（creator_app・last_updater_app）は、変更した時点の値。
   // 変更の内容を知りたいときは、隣り合う履歴の snapshot の中身のフィールドを比べる。
   Todo snapshot = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 変更した時刻。
@@ -59,4 +62,6 @@ message TodoChangeHistory {
   // コメントを削除しても、この値は残る（指すコメントはもうない）。コメントと同時でない変更は空。
   // {calendar} は、問い合わせたカレンダーのもの。
   string comment = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 変えたのが外部アプリ連携のときの、そのアプリ（actor が空のとき）。kebab のユーザーが変えたときは未設定。
+  TodoApp actor_app = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
