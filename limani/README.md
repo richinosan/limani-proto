@@ -271,12 +271,12 @@ Todo は VTODO 1件。
 | calendars | [string](#string) | repeated | この Todo が出ているカレンダー（calendars/{id}）。1 つ以上ある。カレンダーの ID の昇順。 どのカレンダーで作った Todo かによる違いはない（Todo の同期は TodoLink で増減する）。 |
 | creator | [string](#string) |  | 作った人の kebab のユーザー ID（TodoComment.author と同じ形式）。 CalDAV で作った Todo は、アプリパスワードの持ち主。作った人がカレンダーのメンバーから外れていても返る。 表示名・アイコンは返さない。kebab の GetUser で引くこと。 外部アプリ連携で作った Todo は空で、代わりに creator_app を返す。 |
 | last_updater | [string](#string) |  | 最後に更新した人の kebab のユーザー ID（creator と同じ形式）。 UpdateTodo・SetTodoStatus・状態つきの CreateTodoComment・CalDAV の PUT で、中身（summary・description・status・priority・ percent_complete・dtstart・due・completed_time・categories・parent_uid・assignees・completed_assignees・assignee_roles）が実際に変わったときだけ更新する （DTSTAMP・SEQUENCE だけが変わる再送では変わらない）。一度も更新されていなければ creator と同じ。 TodoChangeHistory の actor と対応する。 外部アプリ連携が最後に更新した（作ったまま更新されていない）ときは空で、代わりに last_updater_app を返す。 |
-| completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 担当者ごとの完了を持つのは、assignee_roles で R（実行責任者）を持つ人だけ。 A（説明責任者）・C（相談先）・I（報告先）だけの人（R を兼ねない人）は、自分の分の完了を持たない: completed_assignees に入らず（COMPLETED の Todo でも入らない）、 全員の分がそろったかの判定にも数えない。R の担当者が 1 人もいない Todo（担当者なし、または全員が A・C・I だけ）は、 担当者ごとの完了を持たず、Todo の完了がそのまま完了になる。 A・C・I だけの人が完了にする操作（SetTodoStatus など）をすると、担当者でない人の操作として扱う（SetTodoStatus の「担当者ごとの完了」を参照）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人、A・C・I だけの人を含めると INVALID_ARGUMENT）。 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。 |
+| completed_assignees | [string](#string) | repeated | 自分の分を完了にした担当者の kebab のユーザー ID（assignees の部分集合）。 担当者ごとの完了は、担当者それぞれの作業が終わったかを表す。assignees が 2 人以上いるとき、全員の分が完了になるまで status は COMPLETED にならない（全員の分がそろった時点で COMPLETED になる）。 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき （COMPLETED の Todo では assignees の全員が入る）。 assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。 担当者ごとの完了は、assignee_roles の役割（R・A・C・I）に関わらず、担当者の全員が持つ（役割は完了の数え方を変えない）。 UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。 |
 | creator_app | [TodoApp](#limani-v1-TodoApp) |  | 作ったのが外部アプリ連携のときの、そのアプリ。このとき creator は空。kebab のユーザーが作ったときは未設定。 |
 | last_updater_app | [TodoApp](#limani-v1-TodoApp) |  | 最後に更新したのが外部アプリ連携のとき（一度も更新されていなければ作ったアプリ）の、そのアプリ。このとき last_updater は空。 kebab のユーザーが最後に更新したときは未設定。 |
 | assignee_roles | [TodoAssigneeRoles](#limani-v1-TodoAssigneeRoles) | repeated | 担当者ごとの役割（RACI）。assignees の全員について 1 件ずつ、assignees と同じ順で返す。 ics では、担当者の ATTENDEE の ROLE パラメーター（R は REQ-PARTICIPANT、A は CHAIR、C は OPT-PARTICIPANT、I は NON-PARTICIPANT）に出る。 1 人が複数の役割を持つときは、ROLE には R、A、C、I の順で先に当てはまるものを 1 つだけ出し（A と R を兼ねる人は REQ-PARTICIPANT）、 全部の役割は x-param の X-LIMANI-RACI（例: X-LIMANI-RACI=R,A）に出す。1 つの役割だけの人は ROLE だけを出す。 CalDAV クライアントが ROLE を書き換えたときは、X-LIMANI-RACI より ROLE を優先して読む。 ROLE のない担当者（この機能より前に作った Todo、CalDAV で作った Todo）や、知らない ROLE の値は R として返す。 A は 1 つの Todo につき 1 人まで。
 
-書くには、CreateTodo の todo.assignee_roles、または UpdateTodo の update_mask に assignee_roles を指定する。Todo の書き込み権限が要る （書き込み権限のない（閲覧のみの）メンバーは、自分を担当者に足す（このとき役割は R になる）ことはできるが、役割を変えることはできない。 update_mask に assignee_roles を含めると PERMISSION_DENIED）。 - 指定するのは役割を決めたい担当者だけでよい。指定しなかった担当者は今の役割のまま。assignees も同時に変えるなら、変えたあとの assignees で確かめる。 - assignees にいない人を含める、roles が空、UNSPECIFIED を含める、同じ人を 2 件以上指定する、 書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。 - assignees に足した人で assignee_roles に指定しなかった人は R になる。 - 担当者を外すと、その人の役割も消える。 担当者ごとの完了（completed_assignees）には、R を持つ人だけが入る（completed_assignees を参照）。 |
+書くには、CreateTodo の todo.assignee_roles、または UpdateTodo の update_mask に assignee_roles を指定する。Todo の書き込み権限が要る （書き込み権限のない（閲覧のみの）メンバーは、自分を担当者に足す（このとき役割は R になる）ことはできるが、役割を変えることはできない。 update_mask に assignee_roles を含めると PERMISSION_DENIED）。 - 指定するのは役割を決めたい担当者だけでよい。指定しなかった担当者は今の役割のまま。assignees も同時に変えるなら、変えたあとの assignees で確かめる。 - assignees にいない人を含める、roles が空、UNSPECIFIED を含める、同じ人を 2 件以上指定する、 書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。 - assignees に足した人で assignee_roles に指定しなかった人は R になる。 - 担当者を外すと、その人の役割も消える。 役割は担当者ごとの完了（completed_assignees）に影響しない。どの役割の担当者も、自分の分の完了を持つ。 |
 
 
 
@@ -492,14 +492,12 @@ UpdateTodo の status、状態つきの CreateTodoComment、RedeemTodoCompletion
 
 担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
 
-ここでいう「担当者」は、assignee_roles で R（実行責任者）を持つ人だけ。A（説明責任者）・C（相談先）・I（報告先）だけの人（R を兼ねない人）は
-担当者に数えない（自分の分の完了を持たず、全員の分がそろったかにも入らない）。行為者が A・C・I だけの人のときは、担当者でない人の操作として扱う。
-R の担当者が 1 人もいない Todo は、担当者がいない Todo と同じ。
+担当者は assignee_roles の役割（R・A・C・I）に関わらず全員が自分の分の完了を持ち、全員の分がそろって初めて Todo が完了する（役割は数え方を変えない）。
 
 閲覧のみのメンバーの自己申告: Todo の書き込み権限が要るが、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
 自分の分だけを完了にする（COMPLETED）・取り消す（COMPLETED から戻す。自分の分が完了しているとき）ことができる。
 自分の分が最後なら Todo は COMPLETED になる。担当者でない、中止（CANCELLED）にする、自分の分の完了と関係なく Todo の状態だけを変える、
-ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。A・C・I だけの人も、担当者でない人として PERMISSION_DENIED になる。
+ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。
 状態つきの CreateTodoComment も同じ規則になる。
 
 
@@ -528,13 +526,13 @@ todo.etag を指定すると、保存されている etag と違うときに ABO
 | todo | [Todo](#limani-v1-Todo) |  | 更新する Todo。name で対象を決める。Todo が出ているカレンダーのどの name でもよく、 どのカレンダーから更新しても、Todo が出ているすべてのカレンダーに反映される。 |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | 更新するフィールド。次のどれか: summary, description, status, priority, percent_complete, dtstart, due, completed_time, categories, parent_uid, assignees, completed_assignees, assignee_roles。
 
-assignee_roles は、担当者ごとの役割（RACI）を書く。Todo の書き込み権限が要る。指定した担当者の役割だけが変わり、指定しなかった担当者は今のまま （assignees も変えるなら、変えたあとの assignees で確かめる。足した人で指定しなかった人は R）。 assignees にいない人を含める、roles が空・UNSPECIFIED、同じ人の重複、書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。 役割を変えた結果、数える担当者（R を持つ人。Todo.completed_assignees を参照）の全員の分が完了になれば、Todo の status は COMPLETED になる。 数える担当者が増えた（A・C・I だけだった人が R を持った）ときも、COMPLETED の Todo は COMPLETED のまま、その人の分も完了になる。
+assignee_roles は、担当者ごとの役割（RACI）を書く。Todo の書き込み権限が要る。指定した担当者の役割だけが変わり、指定しなかった担当者は今のまま （assignees も変えるなら、変えたあとの assignees で確かめる。足した人で指定しなかった人は R）。 assignees にいない人を含める、roles が空・UNSPECIFIED、同じ人の重複、書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。 役割は担当者ごとの完了（Todo.completed_assignees を参照）を変えない。役割だけを変える更新で、完了している担当者や Todo の status は変わらない。
 
 completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける （書き込み権限のない閲覧のみのメンバーは、自分が担当者のとき、自分の分だけ。下の「閲覧のみのメンバーの自己申告」） （assignees にない人を含めると INVALID_ARGUMENT。同じリクエストで assignees も変えるなら、変えたあとの assignees で確かめる）。 書いた結果、担当者の全員の分が完了になれば、Todo の status は COMPLETED になる （completed_time を入れ、percent_complete を 100 にする）。完了していない人が残っていれば、 COMPLETED だった Todo は IN_PROCESS に戻り（completed_time を消す）、NEEDS_ACTION だった Todo は IN_PROCESS になる。 status と同時に指定したときは、status の意味（「完了にする操作の行為者」の規則）より completed_assignees を優先する。
 
 status を COMPLETED にしたときの意味は、SetTodoStatus の「担当者ごとの完了」を参照。
 
-閲覧のみのメンバーの自己申告: 書き込み権限のない（閲覧のみの）メンバーが更新できるのは、次の 2 つだけ（assignee_roles は含まれない）。 それ以外のフィールドを update_mask に含める、または ほかの人の担当者・ほかの人の分の完了を変えると PERMISSION_DENIED （書き込み権限のあるメンバーは、これまでどおり全部できる）。 - assignees: 自分自身を担当者に足す、または外す（今の担当者との差が自分だけ）。足すときの ATTENDEE の扱いは、書き込み権限のある人が足すときと同じ。 外すと、自分の分の完了も消える。外した結果、残る担当者の全員の分が完了していれば、Todo は COMPLETED になる（導かれる結果）。 - completed_assignees: 自分が担当者（R を持つ人。A・C・I だけの人は含まれない）のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。 自分の分が最後なら Todo は COMPLETED になる（導かれる結果）。 同じリクエストに assignees と completed_assignees の両方を指定してもよい（どちらも自分の分だけに限られる）。 |
+閲覧のみのメンバーの自己申告: 書き込み権限のない（閲覧のみの）メンバーが更新できるのは、次の 2 つだけ（assignee_roles は含まれない）。 それ以外のフィールドを update_mask に含める、または ほかの人の担当者・ほかの人の分の完了を変えると PERMISSION_DENIED （書き込み権限のあるメンバーは、これまでどおり全部できる）。 - assignees: 自分自身を担当者に足す、または外す（今の担当者との差が自分だけ）。足すときの ATTENDEE の扱いは、書き込み権限のある人が足すときと同じ。 外すと、自分の分の完了も消える。外した結果、残る担当者の全員の分が完了していれば、Todo は COMPLETED になる（導かれる結果）。 - completed_assignees: 自分が担当者のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。 自分の分が最後なら Todo は COMPLETED になる（導かれる結果）。 同じリクエストに assignees と completed_assignees の両方を指定してもよい（どちらも自分の分だけに限られる）。 |
 
 
 

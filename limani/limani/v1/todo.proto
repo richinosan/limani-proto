@@ -136,12 +136,8 @@ message Todo {
   // 担当者の分が完了なのは、その人が自分の分を完了にしたとき、または status が COMPLETED のとき
   // （COMPLETED の Todo では assignees の全員が入る）。
   // assignees が 1 人以下のときは status に一致する（1 人なら、その人の分の完了 = Todo の完了）。
-  // 担当者ごとの完了を持つのは、assignee_roles で R（実行責任者）を持つ人だけ。
-  // A（説明責任者）・C（相談先）・I（報告先）だけの人（R を兼ねない人）は、自分の分の完了を持たない: completed_assignees に入らず（COMPLETED の Todo でも入らない）、
-  // 全員の分がそろったかの判定にも数えない。R の担当者が 1 人もいない Todo（担当者なし、または全員が A・C・I だけ）は、
-  // 担当者ごとの完了を持たず、Todo の完了がそのまま完了になる。
-  // A・C・I だけの人が完了にする操作（SetTodoStatus など）をすると、担当者でない人の操作として扱う（SetTodoStatus の「担当者ごとの完了」を参照）。
-  // UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人、A・C・I だけの人を含めると INVALID_ARGUMENT）。
+  // 担当者ごとの完了は、assignee_roles の役割（R・A・C・I）に関わらず、担当者の全員が持つ（役割は完了の数え方を変えない）。
+  // UpdateTodo の update_mask に completed_assignees を指定すると書ける（assignees にない人を含めると INVALID_ARGUMENT）。
   // 書き込み権限のない（閲覧のみの）メンバーも、自分が担当者なら、自分の分だけは完了にする・取り消すことができる（UpdateTodoRequest を参照）。
   repeated string completed_assignees = 22;
   // 作ったのが外部アプリ連携のときの、そのアプリ。このとき creator は空。kebab のユーザーが作ったときは未設定。
@@ -165,6 +161,6 @@ message Todo {
   //     書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。
   //   - assignees に足した人で assignee_roles に指定しなかった人は R になる。
   //   - 担当者を外すと、その人の役割も消える。
-  // 担当者ごとの完了（completed_assignees）には、R を持つ人だけが入る（completed_assignees を参照）。
+  // 役割は担当者ごとの完了（completed_assignees）に影響しない。どの役割の担当者も、自分の分の完了を持つ。
   repeated TodoAssigneeRoles assignee_roles = 25;
 }
