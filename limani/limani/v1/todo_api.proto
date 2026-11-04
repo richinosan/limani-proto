@@ -55,8 +55,8 @@ message UpdateTodoRequest {
   // assignee_roles は、担当者ごとの役割（RACI）を書く。Todo の書き込み権限が要る。指定した担当者の役割だけが変わり、指定しなかった担当者は今のまま
   // （assignees も変えるなら、変えたあとの assignees で確かめる。足した人で指定しなかった人は R）。
   // assignees にいない人を含める、roles が空・UNSPECIFIED、同じ人の重複、書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。
-  // 役割を変えた結果、数える担当者（R か A を持つ人。Todo.completed_assignees を参照）の全員の分が完了になれば、Todo の status は COMPLETED になる。
-  // 数える担当者が増えた（C・I だけだった人が R か A を持った）ときも、COMPLETED の Todo は COMPLETED のまま、その人の分も完了になる。
+  // 役割を変えた結果、数える担当者（R を持つ人。Todo.completed_assignees を参照）の全員の分が完了になれば、Todo の status は COMPLETED になる。
+  // 数える担当者が増えた（A・C・I だけだった人が R を持った）ときも、COMPLETED の Todo は COMPLETED のまま、その人の分も完了になる。
   //
   // completed_assignees は、担当者ごとの完了を直接書く。書き込み権限があれば、誰の分でも書ける
   // （書き込み権限のない閲覧のみのメンバーは、自分が担当者のとき、自分の分だけ。下の「閲覧のみのメンバーの自己申告」）
@@ -73,7 +73,7 @@ message UpdateTodoRequest {
   // （書き込み権限のあるメンバーは、これまでどおり全部できる）。
   //   - assignees: 自分自身を担当者に足す、または外す（今の担当者との差が自分だけ）。足すときの ATTENDEE の扱いは、書き込み権限のある人が足すときと同じ。
   //     外すと、自分の分の完了も消える。外した結果、残る担当者の全員の分が完了していれば、Todo は COMPLETED になる（導かれる結果）。
-  //   - completed_assignees: 自分が担当者（R か A を持つ人。C・I だけの人は含まれない）のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。
+  //   - completed_assignees: 自分が担当者（R を持つ人。A・C・I だけの人は含まれない）のとき、自分の分の完了にする・取り消す（今の完了している担当者との差が自分だけ）。
   //     自分の分が最後なら Todo は COMPLETED になる（導かれる結果）。
   // 同じリクエストに assignees と completed_assignees の両方を指定してもよい（どちらも自分の分だけに限られる）。
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
@@ -99,14 +99,14 @@ message UpdateTodoRequest {
 //
 // 担当者が 1 人だけの Todo は、その人の分の完了が Todo の完了になる（従来と同じ）。
 //
-// ここでいう「担当者」は、assignee_roles で R（実行責任者）か A（説明責任者）を持つ人だけ。C（相談先）・I（報告先）だけの人は
-// 担当者に数えない（自分の分の完了を持たず、全員の分がそろったかにも入らない）。行為者が C・I だけの人のときは、担当者でない人の操作として扱う。
-// R・A の担当者が 1 人もいない Todo は、担当者がいない Todo と同じ。
+// ここでいう「担当者」は、assignee_roles で R（実行責任者）を持つ人だけ。A（説明責任者）・C（相談先）・I（報告先）だけの人（R を兼ねない人）は
+// 担当者に数えない（自分の分の完了を持たず、全員の分がそろったかにも入らない）。行為者が A・C・I だけの人のときは、担当者でない人の操作として扱う。
+// R の担当者が 1 人もいない Todo は、担当者がいない Todo と同じ。
 //
 // 閲覧のみのメンバーの自己申告: Todo の書き込み権限が要るが、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
 // 自分の分だけを完了にする（COMPLETED）・取り消す（COMPLETED から戻す。自分の分が完了しているとき）ことができる。
 // 自分の分が最後なら Todo は COMPLETED になる。担当者でない、中止（CANCELLED）にする、自分の分の完了と関係なく Todo の状態だけを変える、
-// ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。C・I だけの人も、担当者でない人として PERMISSION_DENIED になる。
+// ほかの人の分が変わるときは PERMISSION_DENIED（何も変わらない）。A・C・I だけの人も、担当者でない人として PERMISSION_DENIED になる。
 // 状態つきの CreateTodoComment も同じ規則になる。
 message SetTodoStatusRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
