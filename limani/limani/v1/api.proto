@@ -34,7 +34,8 @@ service TodoService {
   rpc GetTodo(GetTodoRequest) returns (Todo);
   rpc CreateTodo(CreateTodoRequest) returns (Todo);
   // Todo を更新する。Todo の書き込み権限が要る。ただし、書き込み権限のない（閲覧のみの）メンバーも、その Todo の担当者なら、
-  // update_mask が assignees・completed_assignees だけで、自分を担当者に足す・外す、自分の分の完了・取り消しだけを変えるときはできる。
+  // update_mask が assignees・completed_assignees だけで、自分を担当者に足す・外す、自分の分の完了・取り消しだけを変えるときはできる
+  // （担当者の役割 assignee_roles は変えられない。自分を足すときの役割は R）。
   rpc UpdateTodo(UpdateTodoRequest) returns (Todo);
   // Todo の状態だけを変える。Todo の書き込み権限が要る。ただし、閲覧のみのメンバーも、その Todo の担当者なら、COMPLETED にして
   // 自分の分だけを完了にする・COMPLETED から戻して自分の分だけを取り消すことはできる（中止はできない）。
