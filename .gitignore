@@ -1,2 +1,8 @@
 tmp
 mise.local.toml
+
+# 秘密情報とローカル上書き。テンプレートを追跡する場合は !.env.example のように例外を書く
+.env
+.env.*
+.env*.local
+.envrc.local
