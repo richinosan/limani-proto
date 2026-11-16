@@ -69,6 +69,10 @@ message TodoApp {
 
 // Todo は VTODO 1件。
 message Todo {
+  // 画面の URL 用の連番（number）を一度足して取りやめた。番号と名前は使い回さない
+  reserved 26;
+  reserved "number";
+
   // リソース名（calendars/{calendar}/todos/{todo}）。{todo} はサーバーが決める ID で、UID とは別。
   // UID は任意の文字列（URL や「/」を含むこともある）なので、リソース名には使わない。
   // {calendar} には、Todo が出ているカレンダー（TodoLink）のどれでも指定できる。
@@ -163,9 +167,4 @@ message Todo {
   //   - 担当者を外すと、その人の役割も消える。
   // 役割は担当者ごとの完了（completed_assignees）に影響しない。どの役割の担当者も、自分の分の完了を持つ。
   repeated TodoAssigneeRoles assignee_roles = 25;
-  // name の {calendar} のカレンダーの中での連番（1 始まり）。画面の URL（{APP_ORIGIN}/admin/events/{イベントの alias}/tasks/{number}）に使う。
-  // カレンダーの中で一意で、変わらず、Todo を消しても・カレンダーから外しても再利用しない。
-  // 同じ Todo でも、出ているカレンダー（TodoLink）ごとに別の値になる。
-  // GetTodo の name の {todo} には、ID の代わりにこの連番も指定できる（calendars/{calendar}/todos/{number}）。
-  int32 number = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
