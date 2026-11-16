@@ -137,6 +137,11 @@ message TodoComment {
   // 書き込み権限・通知・Todo の etag・sequence・update_time、カレンダーの sync_token は、anchor のあるレビューコメントと同じ。
   // ListTodoCommentsRequest.anchor_target で絞り込んだときには、review のコメントは返らない。
   bool review = 16 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
+
+  // Todo の中での連番（1 始まり）。作成時に決まり、変わらず、コメントを消しても再利用しない。
+  // 画面の URL（例: ebi のレビュー画面の ?comment={number}）に ID の代わりに使う。Todo が出ているどのカレンダーから見ても同じ値。
+  // 連番から引くには、ListTodoComments の結果から number で探す。0 は連番がない（URL には使わない）
+  int32 number = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // TodoCommentAnchor は、レビューコメントが指す、ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。
