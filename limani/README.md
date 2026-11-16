@@ -901,6 +901,7 @@ review を true にしたコメントは、anchor のあるコメントと同じ
 | resolve_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | スレッドを解決済みにした時刻。レビューのスレッドのルート（anchor のある、または review が true の）コメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。 ResolveTodoComment で入り、UnresolveTodoComment、または解決済みのスレッドへの返信で消える。 すでに解決済みのスレッドにもう一度 ResolveTodoComment を呼んでも変わらない。 解決・解決の取り消しは、コメントの update_time（本文を直した時刻）を変えない。 |
 | resolved_by | [string](#string) |  | スレッドを解決済みにした人の kebab のユーザー ID（author と同じ形式）。解決済みでなければ空。 解決した人がカレンダーのメンバーから外れても、そのまま返る。 |
 | review | [bool](#bool) |  | 文書全体へのレビューコメント（選択範囲を持たないレビューコメント）なら true。OPTIONAL・IMMUTABLE。 true のコメントは、anchor のあるコメントと同じく「レビューのスレッド」のルートになる （reply_to で返信がぶら下がり、ResolveTodoComment・UnresolveTodoComment で解決でき、消すと返信も消える）。 返信（reply_to のあるコメント）に review は付けない（返信は reply_to だけ）。 CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。 anchor・reply_to と同時に指定できない。CreateTodoCommentRequest.status とも同時に指定できない（INVALID_ARGUMENT）。 false（または省略）なら、review のコメントではない（通常のコメントか、anchor のあるルート、または返信）。 書き込み権限・通知・Todo の etag・sequence・update_time、カレンダーの sync_token は、anchor のあるレビューコメントと同じ。 ListTodoCommentsRequest.anchor_target で絞り込んだときには、review のコメントは返らない。 |
+| number | [int32](#int32) |  | Todo の中での連番（1 始まり）。作成時に決まり、変わらず、コメントを消しても再利用しない。 画面の URL（例: ebi のレビュー画面の ?comment={number}）に ID の代わりに使う。Todo が出ているどのカレンダーから見ても同じ値。 連番から引くには、ListTodoComments の結果から number で探す。0 は連番がない（URL には使わない） |
 
 
 
