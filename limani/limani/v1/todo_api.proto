@@ -27,6 +27,8 @@ message ListTodosResponse {
 // GetTodoRequest は Todo を取得する。
 message GetTodoRequest {
   // リソース名（calendars/{calendar}/todos/{todo}）。
+  // {todo} には、ID の代わりに、そのカレンダーの中での連番（Todo.number。数字だけ）も指定できる（画面の URL から引くため）。
+  // 返す name の {todo} は、どちらで引いても ID。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 

@@ -46,6 +46,9 @@ message GetTodoAttachmentRequest {
   // {calendar} は Todo が出ているカレンダーのどれでもよい。"-" を指定すると、
   // Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。
   // "-" のときに返す name も "-" のまま。
+  // {attachment} には、ID の代わりに、Todo の中での連番（TodoAttachment.number。数字だけ）も指定できる。
+  // {calendar} が "-" でなければ、{todo} にもカレンダーの中での連番（Todo.number。数字だけ）を指定できる
+  // （画面の URL から引くため）。返す name の {todo}・{attachment} は、どちらで引いても ID。
   string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
