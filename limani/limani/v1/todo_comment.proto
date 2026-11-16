@@ -37,6 +37,10 @@ import "limani/v1/todo.proto";
 // ルート削除での返信の削除ができる。review のないコメントは、これまでどおり通常のコメントで、返信も解決もない。
 // レビューコメントの作成・返信・解決も、通常のコメントと同じく、Todo の etag・sequence・update_time、カレンダーの sync_token を変えない。
 message TodoComment {
+  // 画面の URL 用の連番（number）を一度足して取りやめた。番号と名前は使い回さない
+  reserved 17;
+  reserved "number";
+
   // リソース名（calendars/{calendar}/todos/{todo}/comments/{comment}）。{comment} はサーバーが決める ID。
   // {calendar}/{todo} には、Todo のリソース名と同じく、Todo が出ているカレンダーのどれでも指定できる。
   // 返す name は、問い合わせたカレンダーのもの（同じコメントでも、カレンダーごとに name が違う）。
@@ -137,11 +141,6 @@ message TodoComment {
   // 書き込み権限・通知・Todo の etag・sequence・update_time、カレンダーの sync_token は、anchor のあるレビューコメントと同じ。
   // ListTodoCommentsRequest.anchor_target で絞り込んだときには、review のコメントは返らない。
   bool review = 16 [(google.api.field_behavior) = IMMUTABLE, (google.api.field_behavior) = OPTIONAL];
-
-  // Todo の中での連番（1 始まり）。作成時に決まり、変わらず、コメントを消しても再利用しない。
-  // 画面の URL（例: ebi のレビュー画面の ?comment={number}）に ID の代わりに使う。Todo が出ているどのカレンダーから見ても同じ値。
-  // 連番から引くには、ListTodoComments の結果から number で探す。0 は連番がない（URL には使わない）
-  int32 number = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // TodoCommentAnchor は、レビューコメントが指す、ドキュメント（ブログ記事・SNS の投稿など）の選択範囲。
