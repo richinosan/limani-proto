@@ -277,6 +277,7 @@ Todo は VTODO 1件。
 | assignee_roles | [TodoAssigneeRoles](#limani-v1-TodoAssigneeRoles) | repeated | 担当者ごとの役割（RACI）。assignees の全員について 1 件ずつ、assignees と同じ順で返す。 ics では、担当者の ATTENDEE の ROLE パラメーター（R は REQ-PARTICIPANT、A は CHAIR、C は OPT-PARTICIPANT、I は NON-PARTICIPANT）に出る。 1 人が複数の役割を持つときは、ROLE には R、A、C、I の順で先に当てはまるものを 1 つだけ出し（A と R を兼ねる人は REQ-PARTICIPANT）、 全部の役割は x-param の X-LIMANI-RACI（例: X-LIMANI-RACI=R,A）に出す。1 つの役割だけの人は ROLE だけを出す。 CalDAV クライアントが ROLE を書き換えたときは、X-LIMANI-RACI より ROLE を優先して読む。 ROLE のない担当者（この機能より前に作った Todo、CalDAV で作った Todo）や、知らない ROLE の値は R として返す。 A は 1 つの Todo につき 1 人まで。
 
 書くには、CreateTodo の todo.assignee_roles、または UpdateTodo の update_mask に assignee_roles を指定する。Todo の書き込み権限が要る （書き込み権限のない（閲覧のみの）メンバーは、自分を担当者に足す（このとき役割は R になる）ことはできるが、役割を変えることはできない。 update_mask に assignee_roles を含めると PERMISSION_DENIED）。 - 指定するのは役割を決めたい担当者だけでよい。指定しなかった担当者は今の役割のまま。assignees も同時に変えるなら、変えたあとの assignees で確かめる。 - assignees にいない人を含める、roles が空、UNSPECIFIED を含める、同じ人を 2 件以上指定する、 書いた結果 A が 2 人以上になる、のどれかなら INVALID_ARGUMENT。 - assignees に足した人で assignee_roles に指定しなかった人は R になる。 - 担当者を外すと、その人の役割も消える。 役割は担当者ごとの完了（completed_assignees）に影響しない。どの役割の担当者も、自分の分の完了を持つ。 |
+| number | [int32](#int32) |  | name の {calendar} のカレンダーの中での連番（1 始まり）。画面の URL（{APP_ORIGIN}/admin/events/{イベントの alias}/tasks/{number}）に使う。 カレンダーの中で一意で、変わらず、Todo を消しても・カレンダーから外しても再利用しない。 同じ Todo でも、出ているカレンダー（TodoLink）ごとに別の値になる。 GetTodo の name の {todo} には、ID の代わりにこの連番も指定できる（calendars/{calendar}/todos/{number}）。 |
 
 
 
@@ -426,7 +427,7 @@ GetTodoRequest は Todo を取得する。
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}）。 {todo} には、ID の代わりに、そのカレンダーの中での連番（Todo.number。数字だけ）も指定できる（画面の URL から引くため）。 返す name の {todo} は、どちらで引いても ID。 |
 
 
 
@@ -579,9 +580,12 @@ Todo を削除すると、添付もすべて消える。TodoLink を外しても
 | size_bytes | [int64](#int64) |  | ファイルの大きさ（バイト）。 |
 | uploader | [string](#string) |  | アップロードした人の kebab のユーザー ID（Todo.assignees と同じ形式）。 アップロードした人がカレンダーのメンバーから外れても、添付は返る。 |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | アップロードした時刻。 |
-| url | [string](#string) |  | Markdown に書く URL（{APP_ORIGIN}/admin/attachments/{todo}/{attachment}）。 ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachment で引き、download_uri で表示する。 {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。この URL では中身は読めない。 |
+| url | [string](#string) |  | Markdown に書く URL（{APP_ORIGIN}/admin/attachments/{todo}/{attachment}）。 ログインが必要な limani の画面の URL で、画面はこの URL の添付を GetTodoAttachment で引き、download_uri で表示する。 {todo}・{attachment} はリソース名の Todo と添付の ID で、カレンダーによらず同じ。この URL では中身は読めない。 本文に埋め込むための、カレンダー（イベント）によらない参照。画面で開くと、連番の URL （/admin/events/{イベントの alias}/tasks/{Todo の number}/attachments/{number}）へ置き換わる。 |
 | download_uri | [string](#string) |  | 中身を読む、期限付きの署名付き URL（{APP_ORIGIN}/files/todos/{todo}/attachments/{attachment}?exp=...&amp;sig=...）。 ログイン（Bearer）なしで GET でき、署名と期限が合わなければ 403、添付が削除されていれば 404。 画像（image/png・image/jpeg・image/gif・image/webp）は inline、それ以外は application/octet-stream の attachment（ダウンロード）として返す。 同じ期間（15 分ごと）の中では同じ URL を返す（ブラウザのキャッシュが効く）。期限が過ぎたら、取り直す。 |
 | download_expire_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | download_uri の期限。発行から 15〜30 分後。 |
+| number | [int32](#int32) |  | Todo の中での連番（1 始まり）。画面の URL （{APP_ORIGIN}/admin/events/{イベントの alias}/tasks/{Todo の number}/attachments/{number}）に使う。 Todo の中で一意で、変わらず、添付を消しても再利用しない。カレンダーによらず同じ。 GetTodoAttachment の name の {attachment} には、ID の代わりにこの連番も指定できる。 |
+| todo | [string](#string) |  | 添付が属する Todo のリソース名（calendars/{calendar}/todos/{todo}）。 {calendar} は name の {calendar}。name の {calendar} が &#34;-&#34; のときは、Todo が出ているカレンダーのうち、 呼び出し元がメンバーであることを確かめたカレンダー（画面が、添付の ID だけの URL から Todo の画面の URL を引くため）。 |
+| todo_number | [int32](#int32) |  | todo の {calendar} のカレンダーの中での Todo の連番（Todo.number）。 |
 
 
 
@@ -652,7 +656,7 @@ GetTodoAttachmentRequest は、添付を取得する（中身は download_uri �
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。 {calendar} は Todo が出ているカレンダーのどれでもよい。&#34;-&#34; を指定すると、 Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。 &#34;-&#34; のときに返す name も &#34;-&#34; のまま。 |
+| name | [string](#string) |  | リソース名（calendars/{calendar}/todos/{todo}/attachments/{attachment}）。 {calendar} は Todo が出ているカレンダーのどれでもよい。&#34;-&#34; を指定すると、 Todo が出ているカレンダーのどれかのメンバーであれば読める（画面の URL は {calendar} を持たないため）。 &#34;-&#34; のときに返す name も &#34;-&#34; のまま。 {attachment} には、ID の代わりに、Todo の中での連番（TodoAttachment.number。数字だけ）も指定できる。 {calendar} が &#34;-&#34; でなければ、{todo} にもカレンダーの中での連番（Todo.number。数字だけ）を指定できる （画面の URL から引くため）。返す name の {todo}・{attachment} は、どちらで引いても ID。 |
 
 
 
@@ -897,6 +901,7 @@ review を true にしたコメントは、anchor のあるコメントと同じ
 | resolve_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | スレッドを解決済みにした時刻。レビューのスレッドのルート（anchor のある、または review が true の）コメントだけに入り、解決済みでなければ未設定（返信・通常のコメントも常に未設定）。 ResolveTodoComment で入り、UnresolveTodoComment、または解決済みのスレッドへの返信で消える。 すでに解決済みのスレッドにもう一度 ResolveTodoComment を呼んでも変わらない。 解決・解決の取り消しは、コメントの update_time（本文を直した時刻）を変えない。 |
 | resolved_by | [string](#string) |  | スレッドを解決済みにした人の kebab のユーザー ID（author と同じ形式）。解決済みでなければ空。 解決した人がカレンダーのメンバーから外れても、そのまま返る。 |
 | review | [bool](#bool) |  | 文書全体へのレビューコメント（選択範囲を持たないレビューコメント）なら true。OPTIONAL・IMMUTABLE。 true のコメントは、anchor のあるコメントと同じく「レビューのスレッド」のルートになる （reply_to で返信がぶら下がり、ResolveTodoComment・UnresolveTodoComment で解決でき、消すと返信も消える）。 返信（reply_to のあるコメント）に review は付けない（返信は reply_to だけ）。 CreateTodoCommentRequest で設定したときだけ保存する。UpdateTodoCommentRequest では変えられない（指定しても無視する）。 anchor・reply_to と同時に指定できない。CreateTodoCommentRequest.status とも同時に指定できない（INVALID_ARGUMENT）。 false（または省略）なら、review のコメントではない（通常のコメントか、anchor のあるルート、または返信）。 書き込み権限・通知・Todo の etag・sequence・update_time、カレンダーの sync_token は、anchor のあるレビューコメントと同じ。 ListTodoCommentsRequest.anchor_target で絞り込んだときには、review のコメントは返らない。 |
+| number | [int32](#int32) |  | Todo の中での連番（1 始まり）。作成時に決まり、変わらず、コメントを消しても再利用しない。 画面の URL（例: ebi のレビュー画面の ?comment={number}）に ID の代わりに使う。Todo が出ているどのカレンダーから見ても同じ値。 連番から引くには、ListTodoComments の結果から number で探す。0 は連番がない（URL には使わない） |
 
 
 
