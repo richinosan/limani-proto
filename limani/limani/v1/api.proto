@@ -95,4 +95,7 @@ service TodoService {
 service TodoCompletionTicketService {
   // 完了チケットを引き換えて、Todo を COMPLETED にし、発行した人の名前で完了報告を書く。
   rpc RedeemTodoCompletionTicket(RedeemTodoCompletionTicketRequest) returns (TodoComment);
+  // 完了チケットの Todo を読む。引き換えはしない。利用者のトークンなしに、担当者ごとの完了（Todo.completed_assignees）を
+  // 確かめるために使う（pompe・ebi が、レビュアーの完了をもって投稿・記事を承認済みにする、など）。
+  rpc GetTodoCompletionTicketTodo(GetTodoCompletionTicketTodoRequest) returns (Todo);
 }
