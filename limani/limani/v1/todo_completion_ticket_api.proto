@@ -47,3 +47,21 @@ message RedeemTodoCompletionTicketRequest {
   // 完了報告の本文（GitHub Flavored Markdown）。TodoComment.body と同じ規則で、空にはできない。
   string body = 2 [(google.api.field_behavior) = REQUIRED];
 }
+
+// GetTodoCompletionTicketTodoRequest は、完了チケットの Todo を読む。
+//
+// 認証は secret だけで、kebab のトークンは要らない（付けても無視する）。チケットは引き換えない（何も書かない）。
+// 引き換え済みのチケットでも読める。
+//
+// 次の順に確かめる。
+//
+// 1. secret が違う・期限切れ・Todo が削除された: NOT_FOUND
+// 2. 発行した人が、Todo が「今」出ているカレンダー（TodoLink）のどれかのメンバーであること
+//    （カレンダーのメンバーの写しで判定する。読み取りだけのロールでもよい）。どれのメンバーでもなければ PERMISSION_DENIED。
+//
+// 返す Todo の name は、発行したカレンダーが今も Todo とリンクしていればそのカレンダーのもの、
+// 外れていれば、発行した人がメンバーであるカレンダーのうち ID がいちばん小さいもの。
+message GetTodoCompletionTicketTodoRequest {
+  // CreateTodoCompletionTicket が返した TodoCompletionTicket.secret。
+  string secret = 1 [(google.api.field_behavior) = REQUIRED];
+}
