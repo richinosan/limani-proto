@@ -71,6 +71,7 @@
   
 - [limani/v1/todo_completion_ticket_api.proto](#limani_v1_todo_completion_ticket_api-proto)
     - [CreateTodoCompletionTicketRequest](#limani-v1-CreateTodoCompletionTicketRequest)
+    - [GetTodoCompletionTicketTodoRequest](#limani-v1-GetTodoCompletionTicketTodoRequest)
     - [RedeemTodoCompletionTicketRequest](#limani-v1-RedeemTodoCompletionTicketRequest)
   
 - [limani/v1/todo_link.proto](#limani_v1_todo_link-proto)
@@ -1240,6 +1241,33 @@ CreateTodoCompletionTicketRequest は、Todo の完了チケットを発行す�
 
 
 
+<a name="limani-v1-GetTodoCompletionTicketTodoRequest"></a>
+
+### GetTodoCompletionTicketTodoRequest
+GetTodoCompletionTicketTodoRequest は、完了チケットの Todo を読む。
+
+認証は secret だけで、kebab のトークンは要らない（付けても無視する）。チケットは引き換えない（何も書かない）。
+引き換え済みのチケットでも読める。
+
+次の順に確かめる。
+
+1. secret が違う・期限切れ・Todo が削除された: NOT_FOUND
+2. 発行した人が、Todo が「今」出ているカレンダー（TodoLink）のどれかのメンバーであること
+   （カレンダーのメンバーの写しで判定する。読み取りだけのロールでもよい）。どれのメンバーでもなければ PERMISSION_DENIED。
+
+返す Todo の name は、発行したカレンダーが今も Todo とリンクしていればそのカレンダーのもの、
+外れていれば、発行した人がメンバーであるカレンダーのうち ID がいちばん小さいもの。
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| secret | [string](#string) |  | CreateTodoCompletionTicket が返した TodoCompletionTicket.secret。 |
+
+
+
+
+
+
 <a name="limani-v1-RedeemTodoCompletionTicketRequest"></a>
 
 ### RedeemTodoCompletionTicketRequest
@@ -1453,6 +1481,7 @@ TodoCompletionTicketService は、完了チケットを引き換える API。
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RedeemTodoCompletionTicket | [RedeemTodoCompletionTicketRequest](#limani-v1-RedeemTodoCompletionTicketRequest) | [TodoComment](#limani-v1-TodoComment) | 完了チケットを引き換えて、Todo を COMPLETED にし、発行した人の名前で完了報告を書く。 |
+| GetTodoCompletionTicketTodo | [GetTodoCompletionTicketTodoRequest](#limani-v1-GetTodoCompletionTicketTodoRequest) | [Todo](#limani-v1-Todo) | 完了チケットの Todo を読む。引き換えはしない。利用者のトークンなしに、担当者ごとの完了（Todo.completed_assignees）を 確かめるために使う（pompe・ebi が、レビュアーの完了をもって投稿・記事を承認済みにする、など）。 |
 
 
 <a name="limani-v1-TodoService"></a>
